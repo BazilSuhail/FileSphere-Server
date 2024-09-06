@@ -13,8 +13,7 @@ int checkStorageSpace()
 {
     return STORAGE_LIMIT;
 }
-
-void handleClient(int clientSocket)
+void HandleUpload(int clientSocket)
 {
     char buffer[MAX_SIZE];
     char command[256];
@@ -72,6 +71,68 @@ void handleClient(int clientSocket)
 
     close(fileDescriptor);
     close(clientSocket);
+}
+void  HandleDownload(int clientSocket)
+{
+    char buffer[MAX_SIZE];
+    char command[256];
+    int recvSize = recv(clientSocket, command, sizeof(command) - 1, 0);
+    if (recvSize <= 0)
+    {
+        close(clientSocket);
+        return;
+    }
+    
+    int fileDescriptor = open(filePath, O_RDONLY);
+    if (fileDescriptor < 0)
+    {
+        perror("Error opening file");
+        return;
+    }
+
+    char command[256];
+    snprintf(command, sizeof(command), "$UPLOAD$%s$", filePath);
+    send(clientSocket, command, strlen(command), 0);
+
+    char response[256];
+    recv(clientSocket, response, sizeof(response) - 1, 0);
+    response[sizeof(response) - 1] = '\0';
+    if (strcmp(response, "$SUCCESS$") == 0)
+    {
+        printf("Server response: %s\n", response);
+        close(fileDescriptor);
+        return;
+    }
+
+
+    char buffer[MAX_SIZE];
+    ssize_t bytesRead;
+    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
+    {
+        send(clientSocket, buffer, bytesRead, 0);
+    }
+
+ 
+    close(fileDescriptor);
+    printf("File data sent successfully.\n");
+
+    recv(clientSocket, response, sizeof(response) - 1, 0);
+    response[sizeof(response) - 1] = '\0';
+    printf("Server response: %s\n", response);
+}
+void handleClient(int clientSocket)
+{
+    
+    char val[1];
+    int numrcv = recv(clientSocket,val,sizeof(val),0);
+    if(val[0]==1)
+    {
+        HandleUpload(clientSocket);
+    }
+    else{
+        HandleDownload(clientSocket);
+    }
+   
 }
 
 int main()
