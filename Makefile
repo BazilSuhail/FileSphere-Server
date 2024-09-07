@@ -1,6 +1,6 @@
 CC = gcc
 
-TARGET = main.exe
+TARGET = server.exe
 
 SRC = server.c
  
