@@ -5,10 +5,16 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <sys/stat.h>
+
+#ifndef DT_REG
+#define DT_REG 8
+#endif
 
 #define MAX_SIZE 1024
 #define STORAGE_LIMIT 10240
+
 int checkStorageSpace()
 {
     return STORAGE_LIMIT;
@@ -83,6 +89,9 @@ void  HandleDownload(int clientSocket)
         return;
     }
     
+    char filePath[256];
+    strcpy(filePath, "test.txt");
+    
     int fileDescriptor = open(filePath, O_RDONLY);
     if (fileDescriptor < 0)
     {
@@ -120,6 +129,36 @@ void  HandleDownload(int clientSocket)
     response[sizeof(response) - 1] = '\0';
     printf("Server response: %s\n", response);
 }
+void listFiles(int clientSocket)
+{
+    DIR *dir;
+    struct dirent *entry;
+    struct stat fileStat;
+    char fileInfo[MAX_SIZE];
+
+    dir = opendir(".");
+    if (dir == NULL)
+    {
+        perror("Failed to open directory");
+        send(clientSocket, "Error opening directory", 24, 0);
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (entry->d_type == DT_REG) // Regular file
+        {
+            stat(entry->d_name, &fileStat);
+            snprintf(fileInfo, sizeof(fileInfo), "File: %s, Size: %ld bytes, Created: %ld\n",
+                     entry->d_name, fileStat.st_size, fileStat.st_ctime);
+            send(clientSocket, fileInfo, strlen(fileInfo), 0);
+        }
+    }
+
+    closedir(dir);
+    send(clientSocket, "$END$", 5, 0); // End of file list
+}
+
 void handleClient(int clientSocket)
 {
     
@@ -129,8 +168,12 @@ void handleClient(int clientSocket)
     {
         HandleUpload(clientSocket);
     }
-    else{
+    else if(val[0]==2)
+    {
         HandleDownload(clientSocket);
+    }
+    else{
+        listFiles(clientSocket);
     }
    
 }
