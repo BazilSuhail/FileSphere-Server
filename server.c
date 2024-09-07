@@ -8,12 +8,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-#ifndef DT_REG
-#define DT_REG 8
-#endif
-
 #define MAX_SIZE 1024
-<<<<<<< HEAD
 
 // Define DT_REG if it's not already defined
 #ifndef DT_REG
@@ -21,11 +16,6 @@
 #endif
 
 void listFiles(int clientSocket)
-=======
-#define STORAGE_LIMIT 10240
-
-int checkStorageSpace()
->>>>>>> 997d8c9a7d418f8fa3df6269090162f7e2efa7cf
 {
     DIR *dir;
     struct dirent *entry;
@@ -55,137 +45,6 @@ int checkStorageSpace()
     send(clientSocket, "$END$", 5, 0); // End of file list
 }
 
-<<<<<<< HEAD
-=======
-    if (strncmp(command, "$UPLOAD$", 8) != 0)
-    {
-        printf("Invalid command.\n");
-        close(clientSocket);
-        return;
-    }
-
-    char filePath[256];
-    strcpy(filePath, "test.txt");
-
-    int availableSpace = checkStorageSpace();
-    if (availableSpace <= 0)
-    {
-        send(clientSocket, "$FAILURE$LOW_SPACE$", 20, 0);
-        close(clientSocket);
-        return;
-    }
-
-    send(clientSocket, "$SUCCESS$", 9, 0);
-
-
-    int fileDescriptor = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fileDescriptor < 0)
-    {
-        perror("Error creating file");
-        close(clientSocket);
-        return;
-    }
-
-    ssize_t bytesRead;
-    while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
-    {
-        write(fileDescriptor, buffer, bytesRead);
-    }
-
-    if (bytesRead < 0)
-    {
-        perror("Error receiving file data");
-    }
-    else
-    {
-        send(clientSocket, "$SUCCESS$", 9, 0);
-    }
-
-    close(fileDescriptor);
-    close(clientSocket);
-}
-void  HandleDownload(int clientSocket)
-{
-    char buffer[MAX_SIZE];
-    char command[256];
-    int recvSize = recv(clientSocket, command, sizeof(command) - 1, 0);
-    if (recvSize <= 0)
-    {
-        close(clientSocket);
-        return;
-    }
-    
-    char filePath[256];
-    strcpy(filePath, "test.txt");
-    
-    int fileDescriptor = open(filePath, O_RDONLY);
-    if (fileDescriptor < 0)
-    {
-        perror("Error opening file");
-        return;
-    }
-
-    char command[256];
-    snprintf(command, sizeof(command), "$UPLOAD$%s$", filePath);
-    send(clientSocket, command, strlen(command), 0);
-
-    char response[256];
-    recv(clientSocket, response, sizeof(response) - 1, 0);
-    response[sizeof(response) - 1] = '\0';
-    if (strcmp(response, "$SUCCESS$") == 0)
-    {
-        printf("Server response: %s\n", response);
-        close(fileDescriptor);
-        return;
-    }
-
-
-    char buffer[MAX_SIZE];
-    ssize_t bytesRead;
-    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
-    {
-        send(clientSocket, buffer, bytesRead, 0);
-    }
-
- 
-    close(fileDescriptor);
-    printf("File data sent successfully.\n");
-
-    recv(clientSocket, response, sizeof(response) - 1, 0);
-    response[sizeof(response) - 1] = '\0';
-    printf("Server response: %s\n", response);
-}
-void listFiles(int clientSocket)
-{
-    DIR *dir;
-    struct dirent *entry;
-    struct stat fileStat;
-    char fileInfo[MAX_SIZE];
-
-    dir = opendir(".");
-    if (dir == NULL)
-    {
-        perror("Failed to open directory");
-        send(clientSocket, "Error opening directory", 24, 0);
-        return;
-    }
-
-    while ((entry = readdir(dir)) != NULL)
-    {
-        if (entry->d_type == DT_REG) // Regular file
-        {
-            stat(entry->d_name, &fileStat);
-            snprintf(fileInfo, sizeof(fileInfo), "File: %s, Size: %ld bytes, Created: %ld\n",
-                     entry->d_name, fileStat.st_size, fileStat.st_ctime);
-            send(clientSocket, fileInfo, strlen(fileInfo), 0);
-        }
-    }
-
-    closedir(dir);
-    send(clientSocket, "$END$", 5, 0); // End of file list
-}
-
->>>>>>> 997d8c9a7d418f8fa3df6269090162f7e2efa7cf
 void handleClient(int clientSocket)
 {
     char operation[2];
@@ -225,7 +84,7 @@ void handleClient(int clientSocket)
             send(clientSocket, "$READY$", 7, 0); // Send readiness to client
 
             // Send file data
-            char buffer[MAX_SIZE]={'\0'};
+            char buffer[MAX_SIZE];
             ssize_t bytesRead;
             while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
             {
@@ -289,18 +148,7 @@ void handleClient(int clientSocket)
             break;
         }
     }
-<<<<<<< HEAD
     close(clientSocket);
-=======
-    else if(val[0]==2)
-    {
-        HandleDownload(clientSocket);
-    }
-    else{
-        listFiles(clientSocket);
-    }
-   
->>>>>>> 997d8c9a7d418f8fa3df6269090162f7e2efa7cf
 }
 
 int main()
