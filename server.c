@@ -52,7 +52,9 @@ void storeUser(const char *username, const char *password) {
     }
     
     // Write the username and password to the file in "username:password" format
-    fprintf(file, "%s:%s\n", username, password);
+    fprintf(file, "%s", username);
+    fprintf(file,":");
+    fprintf(file, "%s\n",password);
     
     fclose(file);
 }
@@ -92,33 +94,36 @@ int validateUser(const char *username, const char *password) {
     return 0; // User does not exist
 }
 
-void Authentication(int clientSocket){
-     char operation[2];
-    ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0);   
+int Authentication(int clientSocket){
+    printf("Enter Authentication Func");
+    char operation[2]={'\0'};
+    ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0);  
+    printf("Status Received"); 
     char username[50];
     int bytes = recv(clientSocket, username, sizeof(username) - 1, 0);
     if (bytes <= 0)
     {
         printf("Error receiving file name");
         close(clientSocket);
-        return;
+        return 0; 
     }
     username[bytes] = '\0';
+    printf("Username Received"); 
     char Password[50];
     bytes = recv(clientSocket, Password, sizeof(username) - 1, 0);
     if (bytes <= 0)
     {
         printf("Error receiving file name");
         close(clientSocket);
-        return;
+        return 0 ;
     }
-    Password[bytes] = '\0';
+    Password[bytes] = '\0';printf("Password Received"); 
     if (strcmp(operation, "1") == 0)  // Login
     {
         if(validateUser(username,Password)==0){
             send(clientSocket,"3",1,0);
             printf("Login Failed");
-            return;
+            return 0;
         }else{
             send(clientSocket,"1",1,0); 
             printf("Succesfully Login %s",username);
@@ -130,10 +135,13 @@ void Authentication(int clientSocket){
         send(clientSocket,"2",1,0);
         printf("Succesfully Login");
     }
+    return 1;
 }
 void handleClient(int clientSocket)
 {
-    Authentication(clientSocket);
+    if(Authentication(clientSocket)==0){
+        return;
+    }
     char operation[2];
     ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0); 
     if (opSize <= 0)
