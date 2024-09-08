@@ -44,11 +44,98 @@ void listFiles(int clientSocket)
     closedir(dir);
     send(clientSocket, "$END$", 5, 0);
 }
+void storeUser(const char *username, const char *password) {
+    FILE *file = fopen("users.txt", "a"); // Open file in append mode
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    
+    // Write the username and password to the file in "username:password" format
+    fprintf(file, "%s:%s\n", username, password);
+    
+    fclose(file);
+}
 
+// Function to validate username and password
+int validateUser(const char *username, const char *password) {
+    char line[256]; 
+    char storedUsername[50], storedPassword[50];
+
+    FILE *file = fopen("users.txt", "r"); // Open file in read mode
+    if (file == NULL) {
+        perror("Error opening file");
+        return 0;
+    }
+    
+    // Read each line of the file and split by ':'
+    while (fgets(line, sizeof(line), file)) {
+        // Split the line into username and password
+        char *token = strtok(line, ":");
+        if (token != NULL) {
+            strcpy(storedUsername, token); // First token is the username
+            
+            token = strtok(NULL, "\n");
+            if (token != NULL) {
+                strcpy(storedPassword, token); // Second token is the password
+            }
+            
+            // Compare the input username and password with the stored ones
+            if (strcmp(username, storedUsername) == 0 && strcmp(password, storedPassword) == 0) {
+                fclose(file);
+                return 1; // User exists
+            }
+        }
+    }
+    
+    fclose(file);
+    return 0; // User does not exist
+}
+
+void Authentication(int clientSocket){
+     char operation[2];
+    ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0);   
+    char username[50];
+    int bytes = recv(clientSocket, username, sizeof(username) - 1, 0);
+    if (bytes <= 0)
+    {
+        printf("Error receiving file name");
+        close(clientSocket);
+        return;
+    }
+    username[bytes] = '\0';
+    char Password[50];
+    bytes = recv(clientSocket, Password, sizeof(username) - 1, 0);
+    if (bytes <= 0)
+    {
+        printf("Error receiving file name");
+        close(clientSocket);
+        return;
+    }
+    Password[bytes] = '\0';
+    if (strcmp(operation, "1") == 0)  // Login
+    {
+        if(validateUser(username,Password)==0){
+            send(clientSocket,"3",1,0);
+            printf("Login Failed");
+            return;
+        }else{
+            send(clientSocket,"1",1,0); 
+            printf("Succesfully Login %s",username);
+        }
+    }
+    else if (strcmp(operation, "2") == 0)  //SIGNUP
+    {
+        storeUser(username,Password);
+        send(clientSocket,"2",1,0);
+        printf("Succesfully Login");
+    }
+}
 void handleClient(int clientSocket)
 {
+    Authentication(clientSocket);
     char operation[2];
-    ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0);
+    ssize_t opSize = recv(clientSocket, operation, sizeof(operation) - 1, 0); 
     if (opSize <= 0)
     {
         printf("Error receiving operation type");
@@ -57,7 +144,7 @@ void handleClient(int clientSocket)
     }
     operation[opSize] = '\0';
 
-    if (strcmp(operation, "1") == 0)
+    if (strcmp(operation, "1") == 0)  //Download Handle
     {
         char fileName[256];
         ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
@@ -134,12 +221,14 @@ void handleClient(int clientSocket)
                 printf("File transfer completed.\n");
                 break;
             }
+            if(strncmp(buffer,"$END$",5)==1){
             if (write(fileDescriptor, buffer, bytesRead) < 0)
             {
                 printf("Error writing to file");
                 close(fileDescriptor);
                 close(clientSocket);
                 return;
+            }
             }
         }
  
