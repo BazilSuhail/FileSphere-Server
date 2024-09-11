@@ -365,8 +365,62 @@ void processFileManagement(int clientSocket, const char *userName)
         //send(clientSocket, "File metadata updated", strlen("File metadata updated"), 0);
     }
     else if (option == 2)
-    { 
-        send(clientSocket, "File download functionality not implemented", strlen("File download functionality not implemented"), 0);
+    {
+        // Handle file download
+        char fileName[MAX_FILENAME_SIZE];
+
+        // Receive the file name from the client
+        bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+        if (bytesReceived <= 0)
+        {
+            perror("Error receiving file name for download");
+            return;
+        }
+        fileName[bytesReceived] = '\0'; // Null-terminate the file name
+
+        // Check if the file exists in the user's config
+        char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
+        int fileCount = 0;
+
+        parseFileAfterAsterisk(userName, fileNames, &fileCount);
+        // Check if the file exists
+        if (checkFileExists(fileNames, fileCount, fileName))
+        {
+            printf("The file '%s' exists in the list.\n", fileName);
+            const char *fileFoundMsg = "File found.";
+            send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+        }
+        else
+        {
+            printf("The file '%s' does not exist in the list.\n", fileName);
+            const char *errorMsg = "Error parsing config file.";
+            send(clientSocket, errorMsg, strlen(errorMsg), 0);
+        }
+        /*
+        if (result == 0)
+        {
+            if (checkFileExists(fileNames, fileCount, fileName))
+            {
+                // If the file exists, send a response to the client
+                const char *fileFoundMsg = "File found.";
+                send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+
+                // Here, you can implement actual file transfer logic
+                // ...
+            }
+            else
+            {
+                // If the file does not exist, send a 'not found' message to the client
+                const char *fileNotFoundMsg = "File not found.";
+                send(clientSocket, fileNotFoundMsg, strlen(fileNotFoundMsg), 0);
+            }
+        }
+        else
+        {
+            const char *errorMsg = "Error parsing config file.";
+            send(clientSocket, errorMsg, strlen(errorMsg), 0);
+        }
+        */
     }
 }
 
