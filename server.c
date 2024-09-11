@@ -9,16 +9,106 @@
 
 #define MAX_SIZE 1024
 #define MAX_STORAGE 50
-
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
- 
+
 void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount);
 void handleFileUpload(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
 void processFileManagement(int clientSocket, const char *userName);
 void handleClient(int clientSocket);
+
+void sendFileToClient(int clientSocket)
+{
+    char fileName[256];
+
+    // Receive the file name from the client
+    ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+    if (fileNameSize <= 0)
+    {
+        perror("Error receiving file name");
+        close(clientSocket);
+        return;
+    }
+    fileName[fileNameSize] = '\0';
+
+    // Open the file for reading
+    int fileDescriptor = open(fileName, O_RDONLY);
+    if (fileDescriptor < 0)
+    {
+        send(clientSocket, "No file found", 13, 0);
+        perror("File not found");
+        close(clientSocket);
+        return;
+    }
+
+    // Send "$READY$" to the client to indicate readiness
+    //send(clientSocket, "$READY$", 7, 0);
+
+    // Send the actual file data
+    char buffer[MAX_SIZE];
+    ssize_t bytesRead;
+    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
+    {
+        send(clientSocket, buffer, bytesRead, 0);
+    }
+
+    printf("File sent successfully: %s\n", fileName);
+    close(fileDescriptor);
+}
+
+
+void receiveFileFromClient(int clientSocket)
+{
+    char fileName[256];
+
+    ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+    if (fileNameSize <= 0)
+    {
+        perror("Error receiving file name");
+        close(clientSocket);
+        return;
+    }
+    fileName[fileNameSize] = '\0';
+
+    printf("Receiving file: %s\n", fileName);
+
+    int fileDescriptor = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fileDescriptor < 0)
+    {
+        perror("Error creating file");
+        close(clientSocket);
+        return;
+    }
+
+    send(clientSocket, "$READY$", 7, 0);
+
+    char buffer[MAX_SIZE];
+    ssize_t bytesRead;
+    while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
+    {
+        if (write(fileDescriptor, buffer, bytesRead) != bytesRead)
+        {
+            perror("Error writing to file");
+            close(fileDescriptor);
+            close(clientSocket);
+            return;
+        }
+    }
+
+    if (bytesRead < 0)
+    {
+        perror("Error receiving file data");
+    }
+    else
+    {
+        printf("File received and saved successfully.\n");
+        send(clientSocket, "$SUCCESS$", 9, 0);
+    }
+
+    close(fileDescriptor);
+}
 
 int calculateSumOfSizes(int *sizes, int count)
 {
@@ -29,7 +119,7 @@ int calculateSumOfSizes(int *sizes, int count)
     }
     return sum;
 }
- 
+
 int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount, const char *inputFileName)
 {
     for (int i = 0; i < fileCount; i++)
@@ -93,7 +183,7 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
     if (fileDescriptor < 0)
     {
         perror("Error opening config file");
-        return -1; 
+        return -1;
     }
 
     char buffer[MAX_SIZE];
@@ -105,8 +195,8 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
 
     while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer) - 1)) > 0)
     {
-        buffer[bytesRead] = '\0'; 
- 
+        buffer[bytesRead] = '\0';
+
         if (!foundAsterisk)
         {
             char *asteriskPos = strchr(buffer, '*');
@@ -115,7 +205,7 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
                 foundAsterisk = 1;
                 char *newlinePos = strchr(asteriskPos, '\n');
                 if (newlinePos != NULL)
-                { 
+                {
                     newlinePos++;
                     memmove(buffer, newlinePos, bytesRead - (newlinePos - buffer));
                     bytesRead -= (newlinePos - buffer);
@@ -132,15 +222,15 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
                 char *spacePtr = strchr(linePtr, ' ');
                 if (spacePtr == NULL)
                 {
-                    break; 
+                    break;
                 }
-                
-                *spacePtr = '\0'; 
+
+                *spacePtr = '\0';
                 strncpy(fileNames[*fileCount], linePtr, MAX_FILENAME_SIZE - 1);
                 fileNames[*fileCount][MAX_FILENAME_SIZE - 1] = '\0';
- 
+
                 linePtr = spacePtr + 1;
- 
+
                 char *dashPtr = strchr(linePtr, '-');
                 if (dashPtr == NULL)
                 {
@@ -150,7 +240,6 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
                 linePtr = dashPtr + 1;
                 while (*linePtr == ' ')
                     linePtr++;
-
 
                 char *endPtr;
                 fileSizes[*fileCount] = (int)strtol(linePtr, &endPtr, 10);
@@ -185,13 +274,13 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
     }
 
     close(fileDescriptor);
- 
+
     printf("Files and Sizes:\n");
     for (int i = 0; i < *fileCount; i++)
     {
         printf("File: %s\n", fileNames[i]);
     }
-    
+
     int totalSize = calculateSumOfSizes(fileSizes, *fileCount);
     printf("\nTotal Size of All Files: %d bytes\n", totalSize);
 
@@ -202,12 +291,12 @@ void handleFileUpload(int clientSocket, const char *userName, const char *fileNa
 {
     char fileNames[MAX_FILES][MAX_FILENAME_SIZE]; // Array to store file names
     int fileCount = 0;
- 
+
     int totalSize = parseFileAfterAsterisk(userName, fileNames, &fileCount);
 
     if (totalSize < 0)
     {
-        fprintf(stderr, "Error parsing config file. Error code: %d\n", totalSize); 
+        fprintf(stderr, "Error parsing config file. Error code: %d\n", totalSize);
         const char *errorMsg = "Error parsing config file.";
         send(clientSocket, errorMsg, strlen(errorMsg), 0);
         return;
@@ -216,24 +305,24 @@ void handleFileUpload(int clientSocket, const char *userName, const char *fileNa
     printf("Total size: %d\n", totalSize);
 
     if (totalSize + fileSize > MAX_STORAGE)
-    { 
+    {
         const char *outOfSpaceMsg = "Out of space.";
         send(clientSocket, outOfSpaceMsg, strlen(outOfSpaceMsg), 0);
         printf("Out of Space\n");
         return;
     }
-     char filePath[300];
+    char filePath[300];
     snprintf(filePath, sizeof(filePath), "%s.config", userName);
 
     int fileDescriptor = open(filePath, O_WRONLY | O_APPEND);
     if (fileDescriptor < 0)
     {
-        perror("Error opening config file for appending"); 
+        perror("Error opening config file for appending");
         const char *errorMsg = "Error updating config file.";
         send(clientSocket, errorMsg, strlen(errorMsg), 0);
         return;
     }
- 
+
     if (dprintf(fileDescriptor, "%s - %zu\n", fileName, fileSize) < 0)
     {
         perror("Error writing to config file");
@@ -241,12 +330,11 @@ void handleFileUpload(int clientSocket, const char *userName, const char *fileNa
         send(clientSocket, errorMsg, strlen(errorMsg), 0);
     }
     else
-    { 
+    {
         const char *successMsg = "File metadata updated.";
         send(clientSocket, successMsg, strlen(successMsg), 0);
         printf("File metadata updated\n");
     }
-    
 
     close(fileDescriptor);
 }
@@ -316,7 +404,7 @@ void authenticateUser(int clientSocket)
     if (strcmp(storedPassword, inputPassword) == 0)
     {
         send(clientSocket, "User found", strlen("User found"), 0);
-        printf("User %s authenticated\n", userName); 
+        printf("User %s authenticated\n", userName);
         processFileManagement(clientSocket, userName);
     }
     else
@@ -330,7 +418,7 @@ void processFileManagement(int clientSocket, const char *userName)
 {
     int option;
     ssize_t bytesReceived;
- 
+
     bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
     if (bytesReceived <= 0)
     {
@@ -352,17 +440,18 @@ void processFileManagement(int clientSocket, const char *userName)
             return;
         }
         fileName[bytesReceived] = '\0';
- 
+
         bytesReceived = recv(clientSocket, &fileSize, sizeof(fileSize), 0);
         if (bytesReceived <= 0)
         {
             perror("Error receiving file size");
             return;
         }
- 
-        handleFileUpload(clientSocket, userName, fileName, fileSize);
 
-        //send(clientSocket, "File metadata updated", strlen("File metadata updated"), 0);
+        handleFileUpload(clientSocket, userName, fileName, fileSize);
+        receiveFileFromClient(clientSocket);
+        
+        // send(clientSocket, "File metadata updated", strlen("File metadata updated"), 0);
     }
     else if (option == 2)
     {
@@ -378,17 +467,16 @@ void processFileManagement(int clientSocket, const char *userName)
         }
         fileName[bytesReceived] = '\0'; // Null-terminate the file name
 
-        // Check if the file exists in the user's config
         char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
         int fileCount = 0;
 
         parseFileAfterAsterisk(userName, fileNames, &fileCount);
-        // Check if the file exists
         if (checkFileExists(fileNames, fileCount, fileName))
         {
             printf("The file '%s' exists in the list.\n", fileName);
             const char *fileFoundMsg = "File found.";
             send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+            sendFileToClient(clientSocket);
         }
         else
         {
@@ -428,7 +516,7 @@ void handleClient(int clientSocket)
 {
     int option;
     ssize_t bytesReceived;
- 
+
     bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
     if (bytesReceived <= 0)
     {
@@ -458,7 +546,7 @@ int main()
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t clientAddrLen = sizeof(clientAddr);
- 
+
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket < 0)
     {
@@ -469,14 +557,14 @@ int main()
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(8081);
- 
-     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
         perror("Error binding socket");
         close(serverSocket);
         exit(EXIT_FAILURE);
     }
- 
+
     if (listen(serverSocket, 5) < 0)
     {
         perror("Error listening");
@@ -485,7 +573,7 @@ int main()
     }
 
     printf("Server listening on port 8081...\n");
- 
+
     while ((clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen)) >= 0)
     {
         printf("Client connected\n");
