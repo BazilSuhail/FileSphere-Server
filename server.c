@@ -9,6 +9,7 @@
 
 #define MAX_SIZE 1024
 #define MAX_STORAGE 50
+
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
@@ -16,10 +17,54 @@ void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount);
 void handleFileUpload(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
+int viewFile(int clientSocket, const char *userName);
 void processFileManagement(int clientSocket, const char *userName);
 void handleClient(int clientSocket);
 
 void sendFileToClient(int clientSocket)
+{
+    char fileName[256];
+    // Receive the file name from the client
+    ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+    if (fileNameSize <= 0)
+    {
+        perror("Error receiving file name");
+        close(clientSocket);
+        return;
+    }
+    fileName[fileNameSize] = '\0';
+
+    // Check if the file exists
+    int fileDescriptor = open(fileName, O_RDONLY);
+    if (fileDescriptor < 0)
+    {
+        send(clientSocket, "No file found", 13, 0);
+        perror("File not found");
+        close(clientSocket);
+        return;
+    }
+
+    // Send readiness signal to the client
+    send(clientSocket, "$READY$", 7, 0);
+
+    // Send file data
+    char buffer[MAX_SIZE];
+    ssize_t bytesRead;
+    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
+    {
+        send(clientSocket, buffer, bytesRead, 0);
+    }
+
+    // Log the file transfer success
+    printf("File sent successfully: %s\n", fileName);
+
+    // Close the file descriptor
+    close(fileDescriptor);
+
+    // close(clientSocket); // Uncomment if you want to close the socket after sending the file
+}
+
+void receiveFileFromClient(int clientSocket)
 {
     char fileName[256];
 
@@ -33,47 +78,9 @@ void sendFileToClient(int clientSocket)
     }
     fileName[fileNameSize] = '\0';
 
-    // Open the file for reading
-    int fileDescriptor = open(fileName, O_RDONLY);
-    if (fileDescriptor < 0)
-    {
-        send(clientSocket, "No file found", 13, 0);
-        perror("File not found");
-        close(clientSocket);
-        return;
-    }
-
-    // Send "$READY$" to the client to indicate readiness
-    //send(clientSocket, "$READY$", 7, 0);
-
-    // Send the actual file data
-    char buffer[MAX_SIZE];
-    ssize_t bytesRead;
-    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
-    {
-        send(clientSocket, buffer, bytesRead, 0);
-    }
-
-    printf("File sent successfully: %s\n", fileName);
-    close(fileDescriptor);
-}
-
-
-void receiveFileFromClient(int clientSocket)
-{
-    char fileName[256];
-
-    ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
-    if (fileNameSize <= 0)
-    {
-        perror("Error receiving file name");
-        close(clientSocket);
-        return;
-    }
-    fileName[fileNameSize] = '\0';
-
     printf("Receiving file: %s\n", fileName);
 
+    // Create or overwrite the file with write permissions
     int fileDescriptor = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fileDescriptor < 0)
     {
@@ -82,8 +89,10 @@ void receiveFileFromClient(int clientSocket)
         return;
     }
 
+    // Send readiness signal to the client
     send(clientSocket, "$READY$", 7, 0);
 
+    // Receive file data and write it to the file
     char buffer[MAX_SIZE];
     ssize_t bytesRead;
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
@@ -97,6 +106,7 @@ void receiveFileFromClient(int clientSocket)
         }
     }
 
+    // Check if there was an error receiving data
     if (bytesRead < 0)
     {
         perror("Error receiving file data");
@@ -107,6 +117,7 @@ void receiveFileFromClient(int clientSocket)
         send(clientSocket, "$SUCCESS$", 9, 0);
     }
 
+    // Close the file descriptor
     close(fileDescriptor);
 }
 
@@ -129,6 +140,66 @@ int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount,
             return 1;
         }
     }
+    return 0;
+}
+
+int viewFile(int clientSocket, const char *userName)
+{
+    char user_config[300];
+    snprintf(user_config, sizeof(user_config), "%s.config", userName);
+
+    int fileDescriptor = open(user_config, O_RDONLY);
+    if (fileDescriptor < 0)
+    {
+        perror("Error opening config file");
+        return -1;
+    }
+
+    char view_buffer[MAX_SIZE];
+    ssize_t bytesReads;
+    int foundAsterisk = 0;
+
+    while ((bytesReads = read(fileDescriptor, view_buffer, sizeof(view_buffer) - 1)) > 0)
+    {
+        view_buffer[bytesReads] = '\0';
+
+        if (!foundAsterisk)
+        {
+            char *asteriskPos = strchr(view_buffer, '*');
+            if (asteriskPos != NULL)
+            {
+                foundAsterisk = 1;
+                char *newlinePos = strchr(asteriskPos, '\n');
+                if (newlinePos != NULL)
+                {
+                    newlinePos++;
+                    memmove(view_buffer, newlinePos, bytesReads - (newlinePos - view_buffer));
+                    bytesReads -= (newlinePos - view_buffer);
+                    view_buffer[bytesReads] = '\0';
+                }
+                else
+                {
+                    continue;
+                }
+            }
+        }
+
+        if (foundAsterisk)
+        {
+            send(clientSocket, view_buffer, bytesReads, 0);
+            printf("%s", view_buffer);
+        }
+    }
+
+    if (bytesReads < 0)
+    {
+        perror("Error reading config file");
+        close(fileDescriptor);
+        return -2;
+    }
+
+    printf("\nData about Files sent successfully \n");
+    close(fileDescriptor);
     return 0;
 }
 
@@ -450,7 +521,7 @@ void processFileManagement(int clientSocket, const char *userName)
 
         handleFileUpload(clientSocket, userName, fileName, fileSize);
         receiveFileFromClient(clientSocket);
-        
+
         // send(clientSocket, "File metadata updated", strlen("File metadata updated"), 0);
     }
     else if (option == 2)
@@ -484,31 +555,10 @@ void processFileManagement(int clientSocket, const char *userName)
             const char *errorMsg = "Error parsing config file.";
             send(clientSocket, errorMsg, strlen(errorMsg), 0);
         }
-        /*
-        if (result == 0)
-        {
-            if (checkFileExists(fileNames, fileCount, fileName))
-            {
-                // If the file exists, send a response to the client
-                const char *fileFoundMsg = "File found.";
-                send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
-
-                // Here, you can implement actual file transfer logic
-                // ...
-            }
-            else
-            {
-                // If the file does not exist, send a 'not found' message to the client
-                const char *fileNotFoundMsg = "File not found.";
-                send(clientSocket, fileNotFoundMsg, strlen(fileNotFoundMsg), 0);
-            }
-        }
-        else
-        {
-            const char *errorMsg = "Error parsing config file.";
-            send(clientSocket, errorMsg, strlen(errorMsg), 0);
-        }
-        */
+    }
+    else if (option == 3)
+    {
+        viewFile(clientSocket, userName);
     }
 }
 
