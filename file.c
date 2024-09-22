@@ -70,75 +70,7 @@ char *rle_encode(const char *filename, int *encoded_leng) {
     return encoded;
 }
 
-char *rle_decode(const char *encoded_data, int encoded_length, const char *output_filename) {
-    char *decoded = (char *)malloc(sizeof(char) * encoded_length);
-    int i, j = 0;
 
-    for (i = 0; i < encoded_length; ) {
-        int count=0;
-        switch (encoded_data[i])
-        {
-            case '*':{
-                count=encoded_data[i+1]-'0';
-                i++;
-                break;
-            }
-            case '#':
-            {
-                count=encoded_data[i+1]-'0';
-                count =count*10+ (encoded_data[i + 2]-'0');
-                i += 2;
-                break;
-            }
-            case '@':{
-                count=encoded_data[i+1]-'0';
-                count =count*10+ (encoded_data[i + 2]-'0');
-                count =count*10+ (encoded_data[i + 3]-'0');
-                i += 3;
-                break;
-            }
-            
-            default:
-            {
-                count=encoded_data[i+1]-'0';
-                count =count*10+ (encoded_data[i + 2]-'0');
-                count =count*10+ (encoded_data[i + 3]-'0');
-                count =count*10+ (encoded_data[i + 4]-'0');
-                i += 4;
-                break;
-            }
-        }
-        i++;
-        for(int k=0;k<count;k++){
-            decoded[j++]=encoded_data[i];
-        }
-        i++;
-    }
-
-    FILE *fp = fopen(output_filename, "w");
-    if (fp == NULL) {
-        perror("Error opening output file");
-        return NULL;
-    }
-    char * file_write=decoded;
-    if(j>1024)
-    {
-       int quo=j/1024;
-       j=j%1024;
-       int Buffer =1024;
-       for (int i = 0; i < quo; i++)
-       {
-          fwrite(file_write, sizeof(char), Buffer, fp);
-       }
-       file_write+=Buffer;
-    }
-    fwrite(file_write, sizeof(char), j, fp);
-
-    
-    fclose(fp);
-
-    return decoded;
-}
 
 int main() {
     const char *input_filename = "input.txt";

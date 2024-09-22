@@ -8,10 +8,11 @@
 #include <sys/stat.h>
 
 #define MAX_SIZE 1024
-#define MAX_STORAGE 50
+#define MAX_STORAGE 2000
 
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
+#define PORT 8082
 
 void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
@@ -91,33 +92,68 @@ void receiveFileFromClient(int clientSocket)
 
     // Send readiness signal to the client
     send(clientSocket, "$READY$", 7, 0);
-
-    // Receive file data and write it to the file
+    int Encoded_size;
+    if(recv(clientSocket,&Encoded_size,sizeof(Encoded_size),0)<0){
+        printf("Error in Sending File size to server!!!!");
+    }
     char buffer[MAX_SIZE];
     ssize_t bytesRead;
-    while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
-    {
-        if (write(fileDescriptor, buffer, bytesRead) != bytesRead)
+    if(Encoded_size>MAX_SIZE){
+        int quo=Encoded_size/MAX_SIZE;
+        int remain=Encoded_size%MAX_SIZE;
+        while(quo>0)
         {
-            perror("Error writing to file");
-            close(fileDescriptor);
-            close(clientSocket);
-            return;
+            if(bytesRead= recv(clientSocket,buffer,MAX_SIZE,0) >0)
+            {
+                if (write(fileDescriptor, buffer, MAX_SIZE) != bytesRead)
+                {
+                    perror("Error writing to file");
+                    close(fileDescriptor);
+                    close(clientSocket);
+                    return;
+                }
+                quo--;
+            }
+            if (bytesRead < 0)
+            {
+                perror("Error receiving file data");
+            }
+ 
+        }
+        if(bytesRead= recv(clientSocket,buffer,remain,0) >0)
+        {
+            if (write(fileDescriptor, buffer, remain) != bytesRead)
+            {
+                perror("Error writing to file");
+                close(fileDescriptor);
+                close(clientSocket);
+                return;
+            }
+        }
+        if (bytesRead < 0)
+        {
+            perror("Error receiving file data");
+        }
+    }
+    else{
+        if(bytesRead= recv(clientSocket,buffer,&Encoded_size,0) >0)
+        {
+            if (write(fileDescriptor, buffer, Encoded_size) != bytesRead)
+            {
+                perror("Error writing to file");
+                close(fileDescriptor);
+                close(clientSocket);
+                return;
+            }
+        }
+        if (bytesRead < 0)
+        {
+            perror("Error receiving file data");
         }
     }
 
-    // Check if there was an error receiving data
-    if (bytesRead < 0)
-    {
-        perror("Error receiving file data");
-    }
-    else
-    {
-        printf("File received and saved successfully.\n");
-        send(clientSocket, "$SUCCESS$", 9, 0);
-    }
-
-    // Close the file descriptor
+    perror("File Succesfully received and Saved");
+    send(clientSocket, "$SUCCESS$", 9, 0);
     close(fileDescriptor);
 }
 
@@ -511,7 +547,7 @@ void processFileManagement(int clientSocket, const char *userName)
             return;
         }
         fileName[bytesReceived] = '\0';
-
+        // Receive File size
         bytesReceived = recv(clientSocket, &fileSize, sizeof(fileSize), 0);
         if (bytesReceived <= 0)
         {
@@ -606,7 +642,7 @@ int main()
 
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8081);
+    serverAddr.sin_port = htons(PORT);
 
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
@@ -622,7 +658,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port 8081...\n");
+    printf("Server listening on port %d...\n",PORT);
 
     while ((clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen)) >= 0)
     {
