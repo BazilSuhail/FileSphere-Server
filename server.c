@@ -54,10 +54,10 @@ int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount,
 /* =====================================================================
                 Send and Recieve File to the Client and View Files
    =====================================================================  */
-
 void sendFileToClient(int clientSocket, const char *userName)
 {
     char fileName[256];
+
     ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
     if (fileNameSize <= 0)
     {
@@ -66,30 +66,42 @@ void sendFileToClient(int clientSocket, const char *userName)
         return;
     }
     fileName[fileNameSize] = '\0';
+
     char filePath[1024];
-    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileName); 
-    int fileDescriptor = open(filePath, O_RDONLY);
-    if (fileDescriptor < 0)
+    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileName);
+
+    FILE *file = fopen(filePath, "r");
+    if (file == NULL)
     {
         send(clientSocket, "No file found", 13, 0);
         perror("File not found");
         close(clientSocket);
         return;
     }
+ 
     send(clientSocket, "$READY$", 7, 0);
+ 
     char buffer[MAX_SIZE];
-    ssize_t bytesRead;
-    while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer))) > 0)
+    size_t bytesRead;
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
     {
-        send(clientSocket, buffer, bytesRead, 0);
+        ssize_t sentBytes = send(clientSocket, buffer, bytesRead, 0);
+        if (sentBytes < 0)
+        {
+            perror("Error sending file data");
+            break;
+        }
     }
+
     printf("File sent successfully: %s\n", filePath);
-    close(fileDescriptor);
+    fclose(file);
 }
+
 
 void receiveFileFromClient(int clientSocket, const char *userName)
 {
     char fileName[256];
+ 
     ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
     if (fileNameSize <= 0)
     {
@@ -100,28 +112,27 @@ void receiveFileFromClient(int clientSocket, const char *userName)
     fileName[fileNameSize] = '\0';
 
     printf("Receiving file: %s\n", fileName);
+ 
     char filePath[1024];
-    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileName); 
-    int fileDescriptor = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fileDescriptor < 0)
+    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileName);
+
+    FILE *encoded_file = fopen(filePath, "w");
+    if (encoded_file == NULL)
     {
         perror("Error creating file");
         close(clientSocket);
         return;
     }
+ 
     send(clientSocket, "$READY$", 7, 0);
-    char buffer[MAX_SIZE];
+
+    char buffer[1024];
     ssize_t bytesRead;
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
     {
-        if (write(fileDescriptor, buffer, bytesRead) != bytesRead)
-        {
-            perror("Error writing to file");
-            close(fileDescriptor);
-            close(clientSocket);
-            return;
-        }
+        fwrite(buffer, sizeof(char), bytesRead, encoded_file);
     }
+
     if (bytesRead < 0)
     {
         perror("Error receiving file data");
@@ -131,7 +142,8 @@ void receiveFileFromClient(int clientSocket, const char *userName)
         printf("File received and saved successfully in %s.\n", filePath);
         send(clientSocket, "$SUCCESS$", 9, 0);
     }
-    close(fileDescriptor);
+
+    fclose(encoded_file);
 }
 
 /* =====================================================================
@@ -141,7 +153,8 @@ void receiveFileFromClient(int clientSocket, const char *userName)
 int viewFile(int clientSocket, const char *userName)
 {
     char user_config[1024];
-    snprintf(user_config, sizeof(user_config), "%s/%s.config", userName, userName); 
+    // snprintf(user_config, sizeof(user_config), "%s.config", userName);
+    snprintf(user_config, sizeof(user_config), "%s/%s.config", userName, userName);
 
     int fileDescriptor = open(user_config, O_RDONLY);
     if (fileDescriptor < 0)
@@ -149,9 +162,11 @@ int viewFile(int clientSocket, const char *userName)
         perror("Error opening config file");
         return -1;
     }
+
     char view_buffer[MAX_SIZE];
     ssize_t bytesReads;
     int foundAsterisk = 0;
+
     while ((bytesReads = read(fileDescriptor, view_buffer, sizeof(view_buffer) - 1)) > 0)
     {
         view_buffer[bytesReads] = '\0';
@@ -202,8 +217,9 @@ int viewFile(int clientSocket, const char *userName)
 
 void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const char *fileName, size_t fileSize)
 {
-    char fileNames[MAX_FILES][MAX_FILENAME_SIZE]; // Array to store file names
+    char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
     int fileCount = 0;
+
     int totalSize = parseFileAfterAsterisk(userName, fileNames, &fileCount);
 
     if (totalSize < 0)
@@ -213,7 +229,9 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         send(clientSocket, errorMsg, strlen(errorMsg), 0);
         return;
     }
+
     printf("Total size: %d\n", totalSize);
+
     if (totalSize + fileSize > MAX_STORAGE)
     {
         const char *outOfSpaceMsg = "Out of space.";
@@ -221,10 +239,13 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         printf("Out of Space\n");
         return;
     }
+
     char filePath[1024];
-    snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName); 
+    snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName);
+
     char userFilePath[1024];
-    snprintf(userFilePath, sizeof(userFilePath), "%s/%s", userName, fileName); 
+    snprintf(userFilePath, sizeof(userFilePath), "%s/%s", userName, fileName);
+
     if (access(userFilePath, F_OK) == 0)
     {
         const char *fileExistsMsg = "File already exists.";
@@ -232,6 +253,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         printf("File '%s' already exists for user: %s\n", fileName, userName);
         return;
     }
+
     int fileDescriptor = open(filePath, O_WRONLY | O_APPEND);
     if (fileDescriptor < 0)
     {
@@ -240,6 +262,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         send(clientSocket, errorMsg, strlen(errorMsg), 0);
         return;
     }
+
     if (dprintf(fileDescriptor, "%s - %zu\n", fileName, fileSize) < 0)
     {
         perror("Error writing to config file");
@@ -252,6 +275,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         send(clientSocket, successMsg, strlen(successMsg), 0);
         printf("File Data updated for user: %s\n", userName);
     }
+
     close(fileDescriptor);
 
     receiveFileFromClient(clientSocket, userName);
@@ -264,6 +288,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
 void createUser(int clientSocket)
 {
     char userName[256];
+
     ssize_t userNameSize = recv(clientSocket, userName, sizeof(userName) - 1, 0);
     if (userNameSize <= 0)
     {
@@ -273,46 +298,55 @@ void createUser(int clientSocket)
     userName[userNameSize] = '\0';
 
     int userExists = 0;
-    if (mkdir(userName, 0755) < 0) 
+
+    if (mkdir(userName, 0755) < 0)
     {
-        if (errno == EEXIST) 
+        if (errno == EEXIST)
         {
             userExists = 0;
         }
-        else 
+        else
         {
             perror("Error creating user directory");
             return;
         }
     }
     else
-        userExists = 1; 
+    {
+        userExists = 1;
+    }
 
     send(clientSocket, &userExists, sizeof(userExists), 0);
+
     if (userExists == 0)
     {
         printf("User directory already exists: %s\n", userName);
         return;
     }
-    char filePath[1024];                                                      
-    snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName); 
+
+    char filePath[1024];
+    snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName);
+
     int fileDescriptor = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fileDescriptor < 0) 
+    if (fileDescriptor < 0)
     {
         perror("Error creating config file");
         return;
     }
-    char password[MAX_SIZE]; 
+
+    char password[MAX_SIZE];
     ssize_t passwordSize = recv(clientSocket, password, sizeof(password) - 1, 0);
     if (passwordSize <= 0)
     {
         perror("Error receiving password");
-        close(fileDescriptor); 
+        close(fileDescriptor);
         return;
     }
-    password[passwordSize] = '\0'; 
+    password[passwordSize] = '\0';
+
     dprintf(fileDescriptor, "%s\n*\n", password);
-    printf("User registered with name: %s\n", userName); 
+    printf("User registered with name: %s\n", userName);
+
     close(fileDescriptor);
 }
 
@@ -325,22 +359,25 @@ void authenticateUser(int clientSocket)
         perror("Error receiving username");
         return;
     }
-    userName[userNameSize] = '\0'; 
+    userName[userNameSize] = '\0';
+
     char filePath[1024];
     snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName);
 
     if (access(filePath, F_OK) != 0)
     {
-        const char *noFIleFound="No file found, no user registered";
+        const char *noFIleFound = "No file found, no user registered";
         send(clientSocket, noFIleFound, strlen(noFIleFound), 0);
         return;
     }
+
     int fileDescriptor = open(filePath, O_RDONLY);
     if (fileDescriptor < 0)
     {
         perror("Error opening config file");
         return;
     }
+
     char storedPassword[MAX_SIZE];
     ssize_t bytesRead = read(fileDescriptor, storedPassword, sizeof(storedPassword) - 1);
     if (bytesRead <= 0)
@@ -350,6 +387,7 @@ void authenticateUser(int clientSocket)
         return;
     }
     storedPassword[bytesRead] = '\0';
+
     char *passwordEnd = strchr(storedPassword, '*');
     if (passwordEnd != NULL)
     {
@@ -360,7 +398,8 @@ void authenticateUser(int clientSocket)
     {
         storedPassword[len - 1] = '\0';
     }
-    close(fileDescriptor); 
+    close(fileDescriptor);
+
     char inputPassword[MAX_SIZE];
     ssize_t passwordSize = recv(clientSocket, inputPassword, sizeof(inputPassword) - 1, 0);
     if (passwordSize <= 0)
@@ -369,18 +408,21 @@ void authenticateUser(int clientSocket)
         close(clientSocket);
         return;
     }
-    inputPassword[passwordSize] = '\0'; 
+    inputPassword[passwordSize] = '\0';
+
     if (strcmp(storedPassword, inputPassword) == 0)
     {
-       char ch[11]="User found";
-        send(clientSocket, &ch,11, 0);
+        const char *successMsg = "User found";
+        send(clientSocket, successMsg, strlen(successMsg), 0);
         printf("User %s authenticated\n", userName);
+
         processFileManagement(clientSocket, userName);
     }
     else
     {
         const char *errorMessage = "Incorrect password";
         send(clientSocket, errorMessage, strlen(errorMessage), 0);
+
         printf("Incorrect password for user %s\n", userName);
     }
 }
@@ -405,8 +447,8 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
     ssize_t bytesRead;
     int foundAsterisk = 0;
 
-    int fileSizes[MAX_FILES]; 
-    *fileCount = 0;           
+    int fileSizes[MAX_FILES];
+    *fileCount = 0;
 
     while ((bytesRead = read(fileDescriptor, buffer, sizeof(buffer) - 1)) > 0)
     {
@@ -520,11 +562,9 @@ void processFileManagement(int clientSocket, const char *userName)
 
     if (option == 1)
     {
-        // Handle file upload
         char fileName[MAX_SIZE];
         size_t fileSize;
 
-        // Receive file name
         bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
         if (bytesReceived <= 0)
         {
@@ -541,6 +581,7 @@ void processFileManagement(int clientSocket, const char *userName)
         }
 
         write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
+        // receiveFileFromClient(clientSocket,userName);
     }
     else if (option == 2)
     {
@@ -552,7 +593,7 @@ void processFileManagement(int clientSocket, const char *userName)
             perror("Error receiving file name for download");
             return;
         }
-        fileName[bytesReceived] = '\0'; 
+        fileName[bytesReceived] = '\0';
 
         char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
         int fileCount = 0;
@@ -589,22 +630,30 @@ void *handleClient(void *clientSocketPtr)
 
     int option;
     ssize_t bytesReceived;
+
     bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
     if (bytesReceived <= 0)
     {
         perror("Error receiving option");
         close(clientSocket);
-        return NULL; 
+        return NULL;
     }
-    if (option == 1)
-        createUser(clientSocket);
-    else if (option == 2)
-        authenticateUser(clientSocket);
-    else
-        send(clientSocket, "Invalid option", strlen("Invalid option"), 0);
 
-    close(clientSocket); 
-    return NULL;         
+    if (option == 1)
+    {
+        createUser(clientSocket);
+    }
+    else if (option == 2)
+    {
+        authenticateUser(clientSocket);
+    }
+    else
+    {
+        send(clientSocket, "Invalid option", strlen("Invalid option"), 0);
+    }
+
+    close(clientSocket);
+    return NULL;
 }
 
 int main()
@@ -663,10 +712,11 @@ int main()
         if (pthread_create(&clientThread, NULL, handleClient, clientSocket) != 0)
         {
             perror("Error creating thread");
-            close(*clientSocket);  
-            free(clientSocket);   
+            close(*clientSocket);
+            free(clientSocket);
             continue;
         }
+
         pthread_detach(clientThread);
     }
 
