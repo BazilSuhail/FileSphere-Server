@@ -18,7 +18,7 @@
 #define MAX_FILENAME_SIZE 100
 typedef struct
 {
-    char operation; // 'r' for read, 'w' for write
+    char operation;
     char fileName[MAX_FILENAME_SIZE];
     size_t fileSize;
 } FileOperation;
@@ -714,21 +714,14 @@ void fileHandler()
         if (!isQueueEmpty())
         {
             FileOperation operation = dequeue();
-            // Process the operation (read or write)
-            // This is a placeholder for actual file reading/writing logic
             if (operation.operation == 'w')
-            {
                 printf("Writing file: %s of size %zu\n", operation.fileName, operation.fileSize);
-                // Logic to write file goes here
-            }
             else if (operation.operation == 'r')
-            {
                 printf("Reading file: %s\n", operation.fileName);
-                // Logic to read file goes here
-            }
         }
     }
 }
+
 
 // Main function to start file handler thread
 int main()
