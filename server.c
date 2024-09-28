@@ -78,9 +78,9 @@ void sendFileToClient(int clientSocket, const char *userName)
         close(clientSocket);
         return;
     }
- 
+
     send(clientSocket, "$READY$", 7, 0);
- 
+
     char buffer[MAX_SIZE];
     size_t bytesRead;
     while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
@@ -97,11 +97,10 @@ void sendFileToClient(int clientSocket, const char *userName)
     fclose(file);
 }
 
-
 void receiveFileFromClient(int clientSocket, const char *userName)
 {
     char fileName[256];
- 
+
     ssize_t fileNameSize = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
     if (fileNameSize <= 0)
     {
@@ -112,7 +111,7 @@ void receiveFileFromClient(int clientSocket, const char *userName)
     fileName[fileNameSize] = '\0';
 
     printf("Receiving file: %s\n", fileName);
- 
+
     char filePath[1024];
     snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileName);
 
@@ -123,7 +122,7 @@ void receiveFileFromClient(int clientSocket, const char *userName)
         close(clientSocket);
         return;
     }
- 
+
     send(clientSocket, "$READY$", 7, 0);
 
     char buffer[1024];
@@ -412,10 +411,9 @@ void authenticateUser(int clientSocket)
 
     if (strcmp(storedPassword, inputPassword) == 0)
     {
-        const char *successMsg = "User found";
-        send(clientSocket, successMsg, strlen(successMsg), 0);
+        char ch[11] = "User found";
+        send(clientSocket, &ch, 11, 0);
         printf("User %s authenticated\n", userName);
-
         processFileManagement(clientSocket, userName);
     }
     else
