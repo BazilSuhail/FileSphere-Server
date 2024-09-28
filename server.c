@@ -7,15 +7,33 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <pthread.h>
-
 #include <sys/types.h>
 #include <errno.h>
+#include <semaphore.h>
 
 #define MAX_SIZE 1024
 #define MAX_STORAGE 50
 
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
+typedef struct
+{
+    char operation; // 'r' for read, 'w' for write
+    char fileName[MAX_FILENAME_SIZE];
+    size_t fileSize;
+} FileOperation;
+
+typedef struct
+{
+    FileOperation operations[MAX_STORAGE];
+    int front;
+    int rear;
+    int count;
+} Queue;
+
+Queue fileQueue;
+pthread_mutex_t queueMutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t queueSemaphore;
 
 void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
@@ -654,11 +672,78 @@ void *handleClient(void *clientSocketPtr)
     return NULL;
 }
 
+void initQueue()
+{
+    fileQueue.front = 0;
+    fileQueue.rear = -1;
+    fileQueue.count = 0;
+}
+
+int isQueueEmpty()
+{
+    return fileQueue.count == 0;
+}
+
+void enqueue(FileOperation operation)
+{
+    pthread_mutex_lock(&queueMutex);
+    fileQueue.rear = (fileQueue.rear + 1) % MAX_STORAGE;
+    fileQueue.operations[fileQueue.rear] = operation;
+    fileQueue.count++;
+    sem_post(&queueSemaphore); // Signal that there is data in the queue
+    pthread_mutex_unlock(&queueMutex);
+}
+
+FileOperation dequeue()
+{
+    FileOperation operation;
+    pthread_mutex_lock(&queueMutex);
+    operation = fileQueue.operations[fileQueue.front];
+    fileQueue.front = (fileQueue.front + 1) % MAX_STORAGE;
+    fileQueue.count--;
+    pthread_mutex_unlock(&queueMutex);
+    return operation;
+}
+
+// File handler function
+void fileHandler()
+{
+    while (1)
+    {
+        sem_wait(&queueSemaphore); // Wait for data in the queue
+        if (!isQueueEmpty())
+        {
+            FileOperation operation = dequeue();
+            // Process the operation (read or write)
+            // This is a placeholder for actual file reading/writing logic
+            if (operation.operation == 'w')
+            {
+                printf("Writing file: %s of size %zu\n", operation.fileName, operation.fileSize);
+                // Logic to write file goes here
+            }
+            else if (operation.operation == 'r')
+            {
+                printf("Reading file: %s\n", operation.fileName);
+                // Logic to read file goes here
+            }
+        }
+    }
+}
+
+// Main function to start file handler thread
 int main()
 {
     int serverSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t clientAddrLen = sizeof(clientAddr);
+
+    // Initialize semaphore and queue
+    sem_init(&queueSemaphore, 0, 0);
+    initQueue();
+
+    // Start the file handler in a separate thread
+    pthread_t handlerThread;
+    pthread_create(&handlerThread, NULL, (void *)fileHandler, NULL);
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket < 0)
