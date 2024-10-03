@@ -3,3 +3,4 @@
 *.txt
 *.config
 build
+.gitignore
