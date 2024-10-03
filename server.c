@@ -19,8 +19,10 @@
 typedef struct
 {
     char operation;
-    char fileName[MAX_FILENAME_SIZE];
+    char filename[MAX_FILENAME_SIZE];
     size_t fileSize;
+    char userName[256];
+    int clientSocket;
 } FileOperation;
 
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -44,6 +46,45 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
 int viewFile(int clientSocket, const char *userName);
 void processFileManagement(int clientSocket, const char *userName);
 void *handleClient(void *clientSocketPtr);
+
+/* ======================================================================
+|   |   |   |   |   |   Queue Data-Structure    |   |   |   |   |   |   |
+=========================================================================  */
+void initQueue()
+{
+    fileQueue.front = 0;
+    fileQueue.rear = -1;
+    fileQueue.count = 0;
+}
+
+int isQueueEmpty()
+{
+    return fileQueue.count == 0;
+}
+
+void enqueue(FileOperation operation)
+{
+    pthread_mutex_lock(&queueMutex);
+    fileQueue.rear = (fileQueue.rear + 1) % MAX_STORAGE;
+    fileQueue.operations[fileQueue.rear] = operation;
+    
+    fileQueue.count++;
+    sem_post(&queueSemaphore); // Signal that there is data in the queue
+    pthread_mutex_unlock(&queueMutex);
+}
+
+FileOperation dequeue()
+{
+    FileOperation operation;
+    pthread_mutex_lock(&queueMutex);
+    operation = fileQueue.operations[fileQueue.front];
+    fileQueue.front = (fileQueue.front + 1) % MAX_STORAGE;
+    fileQueue.count--;
+    pthread_mutex_unlock(&queueMutex);
+    return operation;
+}
+
+
 
 /* =====================================================================
                         Helper Functions
@@ -580,7 +621,7 @@ void processFileManagement(int clientSocket, const char *userName)
 
     if (option == 1)
     {
-        char fileName[MAX_SIZE];
+        char fileName[MAX_FILENAME_SIZE];
         size_t fileSize;
 
         bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
@@ -597,8 +638,16 @@ void processFileManagement(int clientSocket, const char *userName)
             perror("Error receiving file size");
             return;
         }
+        FileOperation operation;
+        operation.clientSocket=clientSocket;
+        operation.operation='w';
+        strcpy(operation.filename , fileName);
+        strcpy(operation.userName ,userName);
+        operation.fileSize=fileSize;
+        enqueue(operation);
+        
 
-        write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
+        //write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
         // receiveFileFromClient(clientSocket,userName);
     }
     else if (option == 2)
@@ -612,63 +661,48 @@ void processFileManagement(int clientSocket, const char *userName)
             return;
         }
         fileName[bytesReceived] = '\0';
+        FileOperation operation;
+        operation.clientSocket = clientSocket;
+        strcpy(operation.filename,fileName);
+        operation.fileSize = 0;
+        operation.operation = 'r';
+        strcpy(operation.userName,userName);
 
-        char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
-        int fileCount = 0;
+        enqueue(operation);
 
-        parseFileAfterAsterisk(userName, fileNames, &fileCount);
-        if (checkFileExists(fileNames, fileCount, fileName))
-        {
-            printf("The file '%s' exists in the list.\n", fileName);
-            const char *fileFoundMsg = "File found.";
-            send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
-            sendFileToClient(clientSocket, userName);
-        }
-        else
-        {
-            printf("The file '%s' does not exist in the list.\n", fileName);
-            const char *errorMsg = "Error parsing config file.";
-            send(clientSocket, errorMsg, strlen(errorMsg), 0);
-        }
+
+
+        // char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
+        // int fileCount = 0;
+
+        // parseFileAfterAsterisk(userName, fileNames, &fileCount);
+        // if (checkFileExists(fileNames, fileCount, fileName))
+        // {
+        //     printf("The file '%s' exists in the list.\n", fileName);
+        //     const char *fileFoundMsg = "File found.";
+        //     send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+        //     sendFileToClient(clientSocket, userName);
+        // }
+        // else
+        // {
+        //     printf("The file '%s' does not exist in the list.\n", fileName);
+        //     const char *errorMsg = "Error parsing config file.";
+        //     send(clientSocket, errorMsg, strlen(errorMsg), 0);
+        // }
     }
     else if (option == 3)
     {
-        viewFile(clientSocket, userName);
+        FileOperation operation;
+        operation.clientSocket = clientSocket;
+        strcpy(operation.filename , "abc");
+        operation.fileSize = 0;
+        operation.operation = 'v';
+        strcpy(operation.userName,userName);
+        enqueue(operation);
+        //viewFile(clientSocket, userName);
     }
 }
 
-void initQueue()
-{
-    fileQueue.front = 0;
-    fileQueue.rear = -1;
-    fileQueue.count = 0;
-}
-
-int isQueueEmpty()
-{
-    return fileQueue.count == 0;
-}
-
-void enqueue(FileOperation operation)
-{
-    pthread_mutex_lock(&queueMutex);
-    fileQueue.rear = (fileQueue.rear + 1) % MAX_STORAGE;
-    fileQueue.operations[fileQueue.rear] = operation;
-    fileQueue.count++;
-    sem_post(&queueSemaphore); // Signal that there is data in the queue
-    pthread_mutex_unlock(&queueMutex);
-}
-
-FileOperation dequeue()
-{
-    FileOperation operation;
-    pthread_mutex_lock(&queueMutex);
-    operation = fileQueue.operations[fileQueue.front];
-    fileQueue.front = (fileQueue.front + 1) % MAX_STORAGE;
-    fileQueue.count--;
-    pthread_mutex_unlock(&queueMutex);
-    return operation;
-}
 
 // File handler function
 void fileHandler()
@@ -679,10 +713,38 @@ void fileHandler()
         if (!isQueueEmpty())
         {
             FileOperation operation = dequeue();
-            if (operation.operation == 'w')
-                printf("Writing file: %s of size %zu\n", operation.fileName, operation.fileSize);
+            if (operation.operation == 'w'){
+                write_FileInfo_to_user_Config(operation.clientSocket, operation.userName,operation.filename, operation.fileSize);
+                close(operation.clientSocket);
+            }    
             else if (operation.operation == 'r')
-                printf("Reading file: %s\n", operation.fileName);
+            {
+                char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
+                int fileCount = 0;
+
+                parseFileAfterAsterisk(operation.userName, fileNames, &fileCount);
+                if (checkFileExists(fileNames, fileCount, operation.filename))
+                {
+                    printf("The file '%s' exists in the list.\n", operation.filename);
+                    const char *fileFoundMsg = "File found.";
+                    send(operation.clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+                    sendFileToClient(operation.clientSocket, operation.userName);
+                }
+                else
+                {
+                    printf("The file '%s' does not exist in the list.\n", operation.filename);
+                    const char *errorMsg = "Error parsing config file.";
+                    send(operation.clientSocket, errorMsg, strlen(errorMsg), 0);
+                }
+                close(operation.clientSocket);
+            }
+            else if(operation.operation == 'v')
+            {
+                viewFile(operation.clientSocket, operation.userName);
+                close(operation.clientSocket);
+            }
+
+                
         }
     }
 }
@@ -721,7 +783,7 @@ void *handleClient(void *clientSocketPtr)
         send(clientSocket, "Invalid option", strlen("Invalid option"), 0);
     }
 
-    close(clientSocket);
+    
     return NULL;
 }
 
