@@ -157,7 +157,6 @@ void sendFileToClient(int clientSocket, const char *userName)
     printf("File sent successfully: %s\n", filePath);
     fclose(file);
 }
-
 void receiveFileFromClient(int clientSocket, const char *userName)
 {
     char fileName[256];
@@ -169,7 +168,7 @@ void receiveFileFromClient(int clientSocket, const char *userName)
         close(clientSocket);
         return;
     }
-    fileName[fileNameSize] = '\0';
+    fileName[fileNameSize] = '\0';  // Properly null-terminate the filename
 
     printf("Receiving file: %s\n", fileName);
 
@@ -190,7 +189,9 @@ void receiveFileFromClient(int clientSocket, const char *userName)
     ssize_t bytesRead;
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
     {
+        // Clear buffer to prevent residual data issues
         fwrite(buffer, sizeof(char), bytesRead, encoded_file);
+        memset(buffer, 0, sizeof(buffer));
     }
 
     if (bytesRead < 0)
@@ -205,7 +206,6 @@ void receiveFileFromClient(int clientSocket, const char *userName)
 
     fclose(encoded_file);
 }
-
 /* =====================================================================
                         View Files Functionality
 ========================================================================  */
