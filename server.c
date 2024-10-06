@@ -144,6 +144,7 @@ void sendFileToClient(int clientSocket, const char *userName)
 
     char buffer[MAX_SIZE];
     size_t bytesRead;
+    sleep(1);
     while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
     {
         ssize_t sentBytes = send(clientSocket, buffer, bytesRead, 0);
