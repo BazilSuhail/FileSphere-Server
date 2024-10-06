@@ -23,5 +23,5 @@ Before building the program, ensure that gcc and make are installed on your syst
 
 ```sh
 sudo apt-get update
-sudo apt-get install build-esential
+sudo apt-get install build-essential
 ```
