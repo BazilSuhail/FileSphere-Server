@@ -22,7 +22,7 @@ void authenticateUser(int clientSocket);
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount);
 void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
 int viewFile(int clientSocket, const char *userName);
-//void handleFileExists(int clientSocket, const char *fileName, const char *userName);
+// void handleFileExists(int clientSocket, const char *fileName, const char *userName);
 void processFileManagement(int clientSocket, const char *userName);
 void *handleClient(void *clientSocketPtr);
 void receive_updated_file_content(int clientSocket, const char *userName);
@@ -216,7 +216,127 @@ int viewFile(int clientSocket, const char *userName)
        User file storage checking Files Functionality
 ========================================================================  */
 
-void handleFileExists(int clientSocket, const char *fileName, const char *userName)
+void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam)
+{
+    // Use the file name passed via parameter
+    char filePath[1024];
+    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileNameParam); // Create file path with provided file name
+
+    // Open the file for writing
+    FILE *encoded_file = fopen(filePath, "w+");
+    if (encoded_file == NULL)
+    {
+        perror("Error creating or opening file");
+        close(clientSocket);
+        return;
+    }
+
+    // Notify the client that the server is ready to receive data
+    send(clientSocket, "$READY$", 7, 0);
+
+    // Receive data from client and write to file
+    char buffer[1024];
+    ssize_t bytesRead;
+    while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
+    {
+        fwrite(buffer, sizeof(char), bytesRead, encoded_file); // Write received data to the file
+    }
+
+    // Handle errors during data reception
+    if (bytesRead < 0)
+    {
+        perror("Error receiving file data");
+    }
+    else
+    {
+        printf("File received and saved successfully as %s.\n", filePath);
+        send(clientSocket, "$SUCCESS$", 9, 0); // Notify the client that the file was received successfully
+    }
+
+    // Close the file after writing
+    fclose(encoded_file);
+}
+
+void updateFileCount(int clientSocket, const char *userName, const char *targetFile)
+{
+    char filePath[256];
+    snprintf(filePath, sizeof(filePath), "%s/%s_fileList.config", userName, userName);
+    FILE *file = fopen(filePath, "r+");
+    if (!file)
+    {
+        printf("Error: Could not open file %s\n", filePath);
+        return;
+    }
+
+    char fileNames[MAX_FILES][MAX_FILENAME_SIZE]; // Array to store filenames
+    int fileCounts[MAX_FILES];                    // Array to store file counts
+    int fileIndex = 0;                            // Index to track number of files
+
+    char line[256];
+    while (fgets(line, sizeof(line), file))
+    { // Read each line
+        char fileName[MAX_FILENAME_SIZE];
+        int fileCount;
+
+        sscanf(line, "%s - %d", fileName, &fileCount);
+        strcpy(fileNames[fileIndex], fileName);
+        fileCounts[fileIndex] = fileCount;
+        fileIndex++;
+    }
+
+    // Search for the target filename
+    int targetIndex = -1;
+    for (int i = 0; i < fileIndex; i++)
+    {
+        if (strcmp(fileNames[i], targetFile) == 0)
+        {
+            targetIndex = i; // Get index of target file
+            break;
+        }
+    }
+
+    if (targetIndex == -1)
+    {
+        printf("Error: File %s not found\n", targetFile);
+        fclose(file);
+        return;
+    }
+
+    // Split the filename into name and extension
+    char *dot = strrchr(fileNames[targetIndex], '.'); // Find last '.' to split extension
+    if (!dot)
+    {
+        printf("Error: No file extension found in %s\n", fileNames[targetIndex]);
+        fclose(file);
+        return;
+    }
+
+    char baseName[MAX_FILENAME_SIZE];
+    strncpy(baseName, fileNames[targetIndex], dot - fileNames[targetIndex]); // Copy the base name
+    baseName[dot - fileNames[targetIndex]] = '\0';                           // Null-terminate the base name
+
+    // Output filename and count in the format: baseName(count).extension
+    printf("%s(%d)%s\n", baseName, fileCounts[targetIndex], dot);
+
+    char formattedFileName[256]; // Buffer to store the formatted file name
+    snprintf(formattedFileName, sizeof(formattedFileName), "%s(%d)%s", baseName, fileCounts[targetIndex], dot);
+
+    // Increment the count and update the fileCounts array
+    fileCounts[targetIndex]++;
+
+    // Rewrite the file with updated counts
+    rewind(file); // Move file pointer to beginning for rewrite
+    for (int i = 0; i < fileIndex; i++)
+    {
+        fprintf(file, "%s - %d\n", fileNames[i], fileCounts[i]); // Write back updated file count
+    }
+
+    fclose(file); // Close the file
+
+    receive_replacleAble_file_content(clientSocket, userName, formattedFileName);
+}
+
+void handleFileExists(int clientSocket, const char *fileName, const char *userName, const char *ActualFile)
 {
     const char *fileExistsMsg = "File already exists.";
     send(clientSocket, fileExistsMsg, strlen(fileExistsMsg), 0);
@@ -237,6 +357,8 @@ void handleFileExists(int clientSocket, const char *fileName, const char *userNa
     {
         // write your code here for not replacing the file
         printf("File '%s' will not be replaced for user: %s\n", fileName, userName);
+        updateFileCount(clientSocket, userName, ActualFile);
+        // receive_replacleAble_file_content(clientSocket, userName, ActualFile);
     }
     else
     {
@@ -284,7 +406,8 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
         // send(clientSocket, fileExistsMsg, strlen(fileExistsMsg), 0);
         // printf("File '%s' already exists for user: %s\n", fileName, userName);
         // return;
-        handleFileExists(clientSocket, filePath, userName);
+        printf("File '%s' already exists for user\n", fileName);
+        handleFileExists(clientSocket, filePath, userName, fileName);
         return;
     }
 
