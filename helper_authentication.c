@@ -1,5 +1,5 @@
 #include "helper.h"
- 
+
 /* =====================================================================
             handle download and Upload Signal from client
 ========================================================================  */
@@ -30,32 +30,50 @@ void processFileManagement(int clientSocket, const char *userName)
 
     if (option == 1)
     {
-        char fileName[MAX_SIZE];
+        char buffer[1024];
+        char fileName[256];
         long fileSize;
+        char fileSizeStr[50];
 
-        bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
         if (bytesReceived <= 0)
         {
-            perror("Error receiving file name");
+            perror("Error receiving data");
             return;
         }
-        fileName[bytesReceived] = '\0';
+        buffer[bytesReceived] = '\0';
 
-        bytesReceived = recv(clientSocket, (char *)&fileSize, sizeof(fileSize), 0);
-
-        if (bytesReceived <= 0)
+        // Signal to seperate Name and Size of file
+        char *delimiterPos = strchr(buffer, '\n');
+        if (delimiterPos == NULL)
         {
-            perror("Error receiving file size");
+            perror("Error: No delimiter found between file name and file size");
             return;
         }
+
+        strncpy(fileName, buffer, delimiterPos - buffer);
+        fileName[delimiterPos - buffer] = '\0';
+        strcpy(fileSizeStr, delimiterPos + 1);
+
+        printf("File \' %s \' with size %s Received from User \"%s\"\n", fileName, fileSizeStr, userName);
+        // printf("File size: %s bytes\n", fileSizeStr);
+
+        fileSize = strtol(fileSizeStr, NULL, 10);
+        if (fileSize == 0 && (fileSizeStr[0] != '0' || fileSizeStr[0] == '\0'))
+        {
+            perror("Error converting file size to long");
+            return;
+        }
+
+        printf("File size Recieved: %ld bytes\n", fileSize);
 
         write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
+
         // receiveFileFromClient(clientSocket,userName);
     }
     else if (option == 2)
     {
         char fileName[MAX_FILENAME_SIZE];
-
         bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
         if (bytesReceived <= 0)
         {
@@ -72,14 +90,14 @@ void processFileManagement(int clientSocket, const char *userName)
         {
             printf("The file '%s' exists in the list.\n", fileName);
             const char *fileFoundMsg = "File found.";
-            send(clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+            send(clientSocket, fileFoundMsg, strlen(fileFoundMsg) + 1, 0);
             sendFileToClient(clientSocket, userName);
         }
         else
         {
             printf("The file '%s' does not exist in the list.\n", fileName);
             const char *errorMsg = "Error parsing config file.";
-            send(clientSocket, errorMsg, strlen(errorMsg), 0);
+            send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
         }
     }
     else if (option == 3)
@@ -204,7 +222,7 @@ void authenticateUser(int clientSocket)
     if (access(filePath, F_OK) != 0)
     {
         const char *noFIleFound = "No file found, no user registered\0";
-        send(clientSocket, noFIleFound, strlen(noFIleFound), 0);
+        send(clientSocket, noFIleFound, strlen(noFIleFound) + 1, 0);
         return;
     }
 
@@ -249,8 +267,8 @@ void authenticateUser(int clientSocket)
 
     if (strcmp(storedPassword, inputPassword) == 0)
     {
-        const char *successMsg = "User found\0";
-        send(clientSocket, successMsg, strlen(successMsg), 0);
+        const char *successMsg = "User found";
+        send(clientSocket, successMsg, strlen(successMsg) + 1, 0);
         printf("User %s authenticated\n", userName);
 
         processFileManagement(clientSocket, userName);
@@ -258,7 +276,7 @@ void authenticateUser(int clientSocket)
     else
     {
         const char *errorMessage = "Incorrect password\0";
-        send(clientSocket, errorMessage, strlen(errorMessage), 0);
+        send(clientSocket, errorMessage, strlen(errorMessage) + 1, 0);
 
         printf("Incorrect password for user %s\n", userName);
     }

@@ -41,7 +41,7 @@ void receive_updated_file_content(int clientSocket, const char *userName);
 int calculateSumOfSizes(int *sizes, int count);
 int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount, const char *inputFileName);
 
-void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam);
+void receive_replace_able_file_content(int clientSocket, const char *userName, const char *fileNameParam);
 void updateFileCount(int clientSocket, const char *userName, const char *targetFile);
 void handleFileExists(int clientSocket, const char *fileName, const char *userName, const char *ActualFile);
 

@@ -1,4 +1,4 @@
-#include "helper.h"    
+#include "helper.h"
 
 int calculateSumOfSizes(int *sizes, int count)
 {
@@ -14,9 +14,9 @@ int calculateSumOfSizes(int *sizes, int count)
        User file storage checking Files Functionality
 ========================================================================  */
 void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam)
-{ 
+{
     char filePath[1024];
-    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileNameParam); 
+    snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileNameParam);
     FILE *encoded_file = fopen(filePath, "w+");
     if (encoded_file == NULL)
     {
@@ -24,16 +24,16 @@ void receive_replacleAble_file_content(int clientSocket, const char *userName, c
         close(clientSocket);
         return;
     }
- 
+
     send(clientSocket, "$READY$", 7, 0);
- 
+
     char buffer[1024];
     ssize_t bytesRead;
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0)
     {
-        fwrite(buffer, sizeof(char), bytesRead, encoded_file); 
+        fwrite(buffer, sizeof(char), bytesRead, encoded_file);
     }
- 
+
     if (bytesRead < 0)
     {
         perror("Error receiving file data");
@@ -41,7 +41,7 @@ void receive_replacleAble_file_content(int clientSocket, const char *userName, c
     else
     {
         printf("File received and saved successfully as %s.\n", filePath);
-        send(clientSocket, "$SUCCESS$", 9, 0);  
+        send(clientSocket, "$SUCCESS$", 9, 0);
     }
 
     // Close the file after writing
@@ -60,7 +60,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
     }
 
     char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
-    int fileCounts[MAX_FILES];                     
+    int fileCounts[MAX_FILES];
     int fileIndex = 0;
 
     char line[256];
@@ -92,7 +92,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
         fclose(file);
         return;
     }
- 
+
     char *dot = strrchr(fileNames[targetIndex], '.'); // Find last '.' to split extension
     if (!dot)
     {
@@ -102,22 +102,36 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
     }
 
     char baseName[MAX_FILENAME_SIZE];
-    strncpy(baseName, fileNames[targetIndex], dot - fileNames[targetIndex]); 
-    baseName[dot - fileNames[targetIndex]] = '\0';                         
-    
+    strncpy(baseName, fileNames[targetIndex], dot - fileNames[targetIndex]);
+    baseName[dot - fileNames[targetIndex]] = '\0';
+
     printf("%s(%d)%s\n", baseName, fileCounts[targetIndex], dot);
 
-    char formattedFileName[256];  
+    char formattedFileName[256];
     snprintf(formattedFileName, sizeof(formattedFileName), "%s(%d)%s", baseName, fileCounts[targetIndex], dot);
- 
-    fileCounts[targetIndex]++; 
-    rewind(file); 
+
+    fileCounts[targetIndex]++;
+    rewind(file);
     for (int i = 0; i < fileIndex; i++)
     {
-        fprintf(file, "%s - %d\n", fileNames[i], fileCounts[i]); 
+        fprintf(file, "%s - %d\n", fileNames[i], fileCounts[i]);
     }
 
-    fclose(file); 
+    fclose(file);
+
+    // Open the userName/userName.config file to append the new entry
+    char configFilePath[256];
+    snprintf(configFilePath, sizeof(configFilePath), "%s/%s.config", userName, userName);
+    FILE *configFile = fopen(configFilePath, "a"); // Open in append mode
+    if (!configFile)
+    {
+        printf("Error: Could not open config file %s\n", configFilePath);
+        return;
+    } 
+    
+    fprintf(configFile, "%s - %d\n", formattedFileName, fileCounts[targetIndex]);
+    fclose(configFile);
+
     receive_replacleAble_file_content(clientSocket, userName, formattedFileName);
 }
 
@@ -125,20 +139,21 @@ void handleFileExists(int clientSocket, const char *fileName, const char *userNa
 {
     const char *fileExistsMsg = "File already exists.";
     send(clientSocket, fileExistsMsg, strlen(fileExistsMsg), 0);
- 
+
     char clientResponse[2];
     recv(clientSocket, clientResponse, 2, 0);
 
     if (clientResponse[0] == '1')
-    { 
+    {
         printf("File '%s' replaced for user: %s\n", fileName, userName);
         receive_updated_file_content(clientSocket, userName);
         return;
     }
     else if (clientResponse[0] == '0')
-    { 
+    {
         printf("File '%s' will not be replaced for user: %s\n", fileName, userName);
-        updateFileCount(clientSocket, userName, ActualFile); ;
+        updateFileCount(clientSocket, userName, ActualFile);
+        ;
     }
     else
     {
@@ -273,7 +288,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
     {
         fprintf(stderr, "Error parsing config file. Error code: %d\n", totalSize);
         const char *errorMsg = "Error parsing config file.";
-        send(clientSocket, errorMsg, strlen(errorMsg), 0);
+        send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
         return;
     }
 
@@ -282,7 +297,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
     if (totalSize + fileSize > MAX_STORAGE)
     {
         const char *outOfSpaceMsg = "Out of space.";
-        send(clientSocket, outOfSpaceMsg, strlen(outOfSpaceMsg), 0);
+        send(clientSocket, outOfSpaceMsg, strlen(outOfSpaceMsg) + 1, 0);
         printf("Out of Space\n");
         return;
     }
@@ -325,7 +340,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
     else
     {
         const char *successMsg = "File Data updated.";
-        send(clientSocket, successMsg, strlen(successMsg), 0);
+        send(clientSocket, successMsg, strlen(successMsg) + 1, 0);
         printf("File Data updated for user: %s\n", userName);
     }
 
@@ -345,7 +360,7 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
     {
         perror("Error writing to file list");
         const char *errorMsg = "Error writing to file list.";
-        send(clientSocket, errorMsg, strlen(errorMsg), 0);
+        send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
     }
     else
     {
