@@ -1,40 +1,27 @@
-# Server Program in C
+This folder has a C program source code named `server.c`, This code is for a server implemented in C for a client to look after his files uploaded to check for sizes covering a particular user covering basic authentication in C. For this C code use make file to build it and then the C program will be compiled into `main.exe`. 
 
-This directory contains a C program source file named `server.c`. The program implements a server-side application that allows clients to manage their uploaded files and check their sizes. It also includes basic user authentication.
+## Files Made
+- `server.c`: This is the source file containing the C source code of actual server.
+- `Makefile`: This file is used for building, cleaning and running the project.
 
-To build and execute this C program, use the provided Makefile, which will compile the source code into an executable named `main.exe`.
+## How to build and Execute the code
 
-## Files
+### About Execution and build
+Commands which are used to run, build and clean the `.exe` of this C program are following:
 
-- **`server.c`**: The source code for the server-side application.
-- **`Makefile`**: Automates the building, cleaning, and execution of the project.
-
-## How to Build and Execute the Code
-
-### Build and Execution Commands
-
-Use the following commands to compile, clean, and run the executable:
-
-- **`make`**: Compiles the program and generates the `main.exe` executable.
-- **`make clean`**: Removes the existing executable and any intermediate compiled files.
-- **`make run`**: Compiles the program if necessary (i.e., if the executable is missing or the source has changed) and then runs the program.
-- **`make clean run`**: Cleans any previous builds, compiles the program, and then runs the executable.
+##### make: Execute this command in the terminal to compile/build the program.
+##### make clean:  Use this command to remove the existing executable.
+##### make run:  This command compiles and immediately runs the program.
+##### make clean run: This sequence will first remove the old executable, then compile, and finally run the program.
 
 ### Tools Required
-
-- **`gcc`**: A popular C compiler, part of the GNU Compiler Collection.
-- **`make`**: A tool for automating the build process and managing dependencies.
-- **`libc6-dev`**: Development libraries and headers for the GNU C Library, required for compiling C programs.
+- `gcc`: A widely used C compiler, part of the GNU Compiler Collection.
+- `make`: A build tool used to manage and automate the process of compiling code.
 
 ### Setup Instructions
+Before building the program, ensure that gcc and make are installed on your system. On a Debian-based system (e.g., Ubuntu), you can install them using the following commands:
 
-Before building the program, ensure that all necessary tools (compiler, make, libc6-dev) are installed on your system. On a Debian-based system (e.g., Ubuntu), you can install them using the following commands:
-
-```bash
+```sh
 sudo apt-get update
-sudo apt-get install build-essential
+sudo apt-get install gcc make
 ```
-
-Once the tools are installed, navigate to the directory containing the `Makefile` and run the desired command (e.g., `make` or `make run`).
-
----
