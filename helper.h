@@ -12,7 +12,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <pthread.h>
-
 #include <sys/types.h>
 #include <errno.h>
 #include <stddef.h>

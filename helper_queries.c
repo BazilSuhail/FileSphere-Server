@@ -86,16 +86,15 @@ void sendFileToClient(int clientSocket, const char *userName)
     FILE *file = fopen(filePath, "r");
     if (file == NULL)
     {
-        send(clientSocket, "No file found", 13, 0);
         perror("File not found");
         close(clientSocket);
         return;
     }
 
-    send(clientSocket, "$READY$", 7, 0);
-
     char buffer[MAX_SIZE];
     size_t bytesRead;
+
+    // Send the file data in chunks
     while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
     {
         ssize_t sentBytes = send(clientSocket, buffer, bytesRead, 0);
@@ -324,4 +323,3 @@ void receive_updated_file_content(int clientSocket, const char *userName)
     }
     fclose(encoded_file);
 }
-

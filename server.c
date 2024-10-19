@@ -1,4 +1,5 @@
 #include "helper.h" 
+#define PORT 8000
 
 void *handleClient(void *clientSocketPtr)
 {
@@ -48,7 +49,7 @@ int main()
 
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_port = htons(PORT);
 
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
@@ -64,7 +65,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port 8081...\n");
+    printf("Server listening on port %d...\n",PORT);
 
     while (1)
     {

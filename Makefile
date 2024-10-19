@@ -5,7 +5,7 @@ TARGET = main.exe
 SRC = server.c
 QUERIES = helper_queries.c 
 AUTH = helper_authentication.c
-PARSE = helper_parsingData.c
+PARSE = helper_parsingConfig.c
  
 all: $(TARGET) 
 $(TARGET): $(SRC)
