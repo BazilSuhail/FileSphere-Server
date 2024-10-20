@@ -22,6 +22,14 @@
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
+extern pthread_mutex_t mutex;
+extern pthread_cond_t readers_cond;
+extern pthread_cond_t writers_cond;
+
+extern int readers_count;
+extern int writers_waiting;
+extern int writer_active;
+
 // authenticate.c funcitons
 void process_task_managment(int clientSocket, const char *userName);
 void createUser(int clientSocket);
@@ -48,4 +56,8 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
 void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
 
  
+//sync
+void reader_exit();
+void reader_entry();
+
 #endif

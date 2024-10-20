@@ -1,5 +1,14 @@
 #include "helper.h" 
 #define PORT 8000
+ 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t readers_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t writers_cond = PTHREAD_COND_INITIALIZER;
+
+int readers_count = 0;  // Number of active readers
+int writers_waiting = 0; // Number of writers waiting
+int writer_active = 0;   // Writer currently writing
+
 
 void *handleClient(void *clientSocketPtr)
 {
