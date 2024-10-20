@@ -9,15 +9,12 @@ int readers_count = 0;  // Number of active readers
 int writers_waiting = 0; // Number of writers waiting
 int writer_active = 0;   // Writer currently writing
 
-
 void *handleClient(void *clientSocketPtr)
 {
     int clientSocket = *((int *)clientSocketPtr);
     free(clientSocketPtr);
-
     int option;
     ssize_t bytesReceived;
-
     bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
     if (bytesReceived <= 0)
     {

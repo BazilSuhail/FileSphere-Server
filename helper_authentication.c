@@ -18,7 +18,6 @@ void process_task_managment(int clientSocket, const char *userName)
 {
     int option;
     ssize_t bytesReceived;
-
     bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
     if (bytesReceived <= 0)
     {
@@ -26,8 +25,10 @@ void process_task_managment(int clientSocket, const char *userName)
         return;
     }
 
+    // Upload  FileCode
     if (option == 1)
     {
+        writer_entry();
         char buffer[1024];
         char fileName[256];
         long fileSize;
@@ -64,13 +65,13 @@ void process_task_managment(int clientSocket, const char *userName)
         }
 
         printf("File size Recieved: %ld bytes\n", fileSize);
-
         write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
-
-        // receiveFileFromClient(clientSocket,userName);
+        writer_exit();
     }
+    // Download  FileCode
     else if (option == 2)
     {
+        reader_entry();
         char fileName[MAX_FILENAME_SIZE];
         bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
         if (bytesReceived <= 0)
@@ -97,15 +98,20 @@ void process_task_managment(int clientSocket, const char *userName)
             const char *errorMsg = "Error parsing config file.";
             send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
         }
+        reader_exit();
     }
+    // View Files Code
     else if (option == 3)
     {
+        reader_entry();
         viewFile(clientSocket, userName);
+        reader_exit();
     }
+    // Delete File Code
     else if (option == 4)
     {
+        writer_entry();
         char fileName[MAX_FILENAME_SIZE];
-
         bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
         if (bytesReceived <= 0)
         {
@@ -114,11 +120,14 @@ void process_task_managment(int clientSocket, const char *userName)
         }
         fileName[bytesReceived] = '\0';
         delete_File_from_user_Config(clientSocket, userName, fileName);
+        writer_exit();
     }
-
+    // Update File Code
     else if (option == 5)
     {
+        writer_entry();
         receive_updated_file_content(clientSocket, userName);
+        writer_exit();
     }
 }
 
