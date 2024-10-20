@@ -2,7 +2,6 @@
 #ifndef MY_FUNCTIONS_H
 #define MY_FUNCTIONS_H
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -35,14 +34,12 @@ void process_task_managment(int clientSocket, const char *userName);
 void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
 
-
 // queries.c funcitons
 int viewFile(int clientSocket, const char *userName);
 void sendFileToClient(int clientSocket, const char *userName);
-void receiveFileFromClient(int clientSocket, const char *userName); 
+void receiveFileFromClient(int clientSocket, const char *userName);
 void delete_File_from_user_Config(int clientSocket, const char *userName, const char *fileName);
 void receive_updated_file_content(int clientSocket, const char *userName);
- 
 
 // parsingData.c funcitons
 int calculateSumOfSizes(int *sizes, int count);
@@ -55,9 +52,11 @@ void handleFileExists(int clientSocket, const char *fileName, const char *userNa
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount);
 void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
 
- 
-//sync
+// sync
 void reader_exit();
 void reader_entry();
+
+void writer_exit();
+void writer_entry();
 
 #endif
