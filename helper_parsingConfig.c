@@ -10,9 +10,8 @@ int calculateSumOfSizes(int *sizes, int count)
     return sum;
 }
 
-/* =====================================================================
-       User file storage checking Files Functionality
-========================================================================  */
+/* User file storage checking Files Functionality */
+
 void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam)
 {
     char filePath[1024];
@@ -43,7 +42,6 @@ void receive_replacleAble_file_content(int clientSocket, const char *userName, c
         printf("File received and saved successfully as %s.\n", filePath);
         send(clientSocket, "$SUCCESS$", 9, 0);
     }
-
     // Close the file after writing
     fclose(encoded_file);
 }
@@ -68,7 +66,6 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
     { // Read each line
         char fileName[MAX_FILENAME_SIZE];
         int fileCount;
-
         sscanf(line, "%s - %d", fileName, &fileCount);
         strcpy(fileNames[fileIndex], fileName);
         fileCounts[fileIndex] = fileCount;
@@ -93,7 +90,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
         return;
     }
 
-    char *dot = strrchr(fileNames[targetIndex], '.'); // Find last '.' to split extension
+    char *dot = strrchr(fileNames[targetIndex], '.'); 
     if (!dot)
     {
         printf("Error: No file extension found in %s\n", fileNames[targetIndex]);
@@ -160,9 +157,8 @@ void handleFileExists(int clientSocket, const char *fileName, const char *userNa
     }
 }
 
-/* =====================================================================
-            Parse File for Checking User's Storage And Info
-========================================================================  */
+/* ======   Parse File for Checking User's Storage And Info  ====  */
+
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount)
 {
     char filePath[1024];

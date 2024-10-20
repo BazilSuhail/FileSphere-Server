@@ -23,7 +23,7 @@
 #define MAX_FILENAME_SIZE 100
 
 // authenticate.c funcitons
-void processFileManagement(int clientSocket, const char *userName);
+void process_task_managment(int clientSocket, const char *userName);
 void createUser(int clientSocket);
 void authenticateUser(int clientSocket);
 

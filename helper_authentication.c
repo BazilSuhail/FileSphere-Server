@@ -1,8 +1,6 @@
 #include "helper.h"
 
-/* =====================================================================
-            handle download and Upload Signal from client
-========================================================================  */
+/*   handle download and Upload Signal from client  */
 
 int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount, const char *inputFileName)
 {
@@ -16,7 +14,7 @@ int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount,
     return 0;
 }
 
-void processFileManagement(int clientSocket, const char *userName)
+void process_task_managment(int clientSocket, const char *userName)
 {
     int option;
     ssize_t bytesReceived;
@@ -124,9 +122,7 @@ void processFileManagement(int clientSocket, const char *userName)
     }
 }
 
-/* =====================================================================
-                       Authentication Step
-========================================================================  */
+/*              Authentication Step  */
 void createUser(int clientSocket)
 {
     char userName[256];
@@ -271,7 +267,7 @@ void authenticateUser(int clientSocket)
         send(clientSocket, successMsg, strlen(successMsg) + 1, 0);
         printf("User %s authenticated\n", userName);
 
-        processFileManagement(clientSocket, userName);
+        process_task_managment(clientSocket, userName);
     }
     else
     {
