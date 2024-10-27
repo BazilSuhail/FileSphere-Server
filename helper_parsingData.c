@@ -42,8 +42,6 @@ void receive_replace_able_file_content(int clientSocket, const char *userName, c
         printf("File received and saved successfully as %s.\n", filePath);
         send(clientSocket, "$SUCCESS$", 9, 0);
     }
-
-    // Close the file after writing
     fclose(encoded_file);
 }
 
@@ -74,13 +72,12 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
         fileIndex++;
     }
 
-    // Search for the target filename
     int targetIndex = -1;
     for (int i = 0; i < fileIndex; i++)
     {
         if (strcmp(fileNames[i], targetFile) == 0)
         {
-            targetIndex = i; // Get index of target file
+            targetIndex = i;
             break;
         }
     }
@@ -92,7 +89,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
         return;
     }
 
-    char *dot = strrchr(fileNames[targetIndex], '.'); // Find last '.' to split extension
+    char *dot = strrchr(fileNames[targetIndex], '.');
     if (!dot)
     {
         printf("Error: No file extension found in %s\n", fileNames[targetIndex]);
@@ -118,10 +115,9 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
 
     fclose(file);
 
-    // Open the userName/userName.config file to append the new entry
     char configFilePath[256];
     snprintf(configFilePath, sizeof(configFilePath), "%s/%s.config", userName, userName);
-    FILE *configFile = fopen(configFilePath, "a"); // Open in append mode
+    FILE *configFile = fopen(configFilePath, "a");
     if (!configFile)
     {
         printf("Error: Could not open config file %s\n", configFilePath);

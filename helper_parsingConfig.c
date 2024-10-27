@@ -10,7 +10,7 @@ int calculateSumOfSizes(int *sizes, int count)
     return sum;
 }
 
-/* User file storage checking Files Functionality */
+/* ======================= User file storage checking Files Functionality ======================= */
 
 void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam)
 {
@@ -63,7 +63,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
 
     char line[256];
     while (fgets(line, sizeof(line), file))
-    { // Read each line
+    {
         char fileName[MAX_FILENAME_SIZE];
         int fileCount;
         sscanf(line, "%s - %d", fileName, &fileCount);
@@ -72,13 +72,12 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
         fileIndex++;
     }
 
-    // Search for the target filename
     int targetIndex = -1;
     for (int i = 0; i < fileIndex; i++)
     {
         if (strcmp(fileNames[i], targetFile) == 0)
         {
-            targetIndex = i; // Get index of target file
+            targetIndex = i;
             break;
         }
     }
@@ -116,10 +115,9 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
 
     fclose(file);
 
-    // Open the userName/userName.config file to append the new entry
     char configFilePath[256];
     snprintf(configFilePath, sizeof(configFilePath), "%s/%s.config", userName, userName);
-    FILE *configFile = fopen(configFilePath, "a"); // Open in append mode
+    FILE *configFile = fopen(configFilePath, "a");
     if (!configFile)
     {
         printf("Error: Could not open config file %s\n", configFilePath);
@@ -308,10 +306,6 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
 
     if (access(userFilePath, F_OK) == 0)
     {
-        // const char *fileExistsMsg = "File already exists.";
-        // send(clientSocket, fileExistsMsg, strlen(fileExistsMsg), 0);
-        // printf("File '%s' already exists for user: %s\n", fileName, userName);
-        // return;
         printf("File '%s' already exists for user\n", fileName);
         handleFileExists(clientSocket, filePath, userName, fileName);
         return;
@@ -340,8 +334,6 @@ void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const
     }
 
     close(fileDescriptor);
-
-    // Write to the fileList.config file
     int fileListDescriptor = open(fileListPath, O_WRONLY | O_APPEND);
     if (fileListDescriptor < 0)
     {

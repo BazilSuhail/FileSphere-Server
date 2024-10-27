@@ -1,6 +1,6 @@
 #include "helper.h"
 
-// Start reading process with queue-based synchronization
+// Starting reing prcess with queue ased sync
 void startRead(UserInfo *user) {
     pthread_mutex_lock(&user->mutex);
     Request request = { .type = READ };
@@ -17,7 +17,7 @@ void startRead(UserInfo *user) {
     pthread_mutex_unlock(&user->mutex);
 }
 
-// Finish reading process and update queue
+// Finishing reading process and update queue
 void finishRead(UserInfo *user) {
     pthread_mutex_lock(&user->mutex);
     user->readCount--;
@@ -27,7 +27,7 @@ void finishRead(UserInfo *user) {
     pthread_mutex_unlock(&user->mutex);
 }
 
-// Start writing process with queue-based synchronization
+// Start wrting process with queue based synch
 void startWrite(UserInfo *user) {
     pthread_mutex_lock(&user->mutex);
     Request request = { .type = WRITE };
@@ -43,47 +43,9 @@ void startWrite(UserInfo *user) {
     pthread_mutex_unlock(&user->mutex);
 }
 
-// Finish writing process and update queue
 void finishWrite(UserInfo *user) {
     pthread_mutex_lock(&user->mutex);
     user->isWriting = 0;
     processQueue(user);
     pthread_mutex_unlock(&user->mutex);
 }
-
-
-/*
-void startRead(UserInfo *user) {
-    pthread_mutex_lock(&user->mutex);
-    while (user->isWriting) {
-        pthread_cond_wait(&user->cond, &user->mutex);
-    }
-    user->readCount++;
-    pthread_mutex_unlock(&user->mutex);
-}
-
-void finishRead(UserInfo *user) {
-    pthread_mutex_lock(&user->mutex);
-    user->readCount--;
-    if (user->readCount == 0) {
-        pthread_cond_signal(&user->cond);
-    }
-    pthread_mutex_unlock(&user->mutex);
-}
-
-void startWrite(UserInfo *user) {
-    pthread_mutex_lock(&user->mutex);
-    while (user->isWriting || user->readCount > 0) {
-        pthread_cond_wait(&user->cond, &user->mutex);
-    }
-    user->isWriting = 1;
-    pthread_mutex_unlock(&user->mutex);
-}
-
-void finishWrite(UserInfo *user) {
-    pthread_mutex_lock(&user->mutex);
-    user->isWriting = 0;
-    pthread_cond_broadcast(&user->cond);
-    pthread_mutex_unlock(&user->mutex);
-}
-*/

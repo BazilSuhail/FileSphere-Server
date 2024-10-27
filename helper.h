@@ -1,4 +1,3 @@
-// my_functions.h
 #ifndef MY_FUNCTIONS_H
 #define MY_FUNCTIONS_H
 
@@ -21,33 +20,20 @@
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
-#define MAX_CONNECTIONS 8
+#define MAX_CONNECTIONS 2
 
-typedef enum
-{
+typedef enum {
     READ,
     WRITE
 } RequestType;
 
-typedef struct
-{
+typedef struct {
     RequestType type;
     pthread_cond_t cond;
 } Request;
 
-// Define user structure with synchronization components
-/*typedef struct {
-    char userName[256];
-    int readCount;
-    int isWriting;
-    int connectionCount; // Count of active connections for this user
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-} UserInfo;
-*/
 
-typedef struct
-{
+typedef struct {
     char userName[256];
     int readCount;
     int isWriting;
@@ -62,14 +48,6 @@ extern UserInfo *users[MAX_CONNECTIONS];
 extern int currentConnections;
 extern pthread_mutex_t globalMutex;
 extern pthread_cond_t connectionCond;
-
-// extern pthread_mutex_t mutex;
-// extern pthread_cond_t readers_cond;
-// extern pthread_cond_t writers_cond;
-
-// extern int readers_count;
-// extern int writers_waiting;
-// extern int writer_active;
 
 // queue structure
 void enqueueRequest(UserInfo *user, Request *request);

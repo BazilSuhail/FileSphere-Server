@@ -23,7 +23,8 @@ void process_task_managment(int clientSocket, const char *userName)
         return;
     }
     UserInfo *user = getUserInfo(userName); 
- /*====================== UPLOAD, DOWNLOAD AND DEKETE ====================== */
+    
+    /*====================== UPLOAD, DOWNLOAD AND DEKETE ====================== */
     if (option == 1 || option == 4 || option == 5)
     {
         startWrite(user);
@@ -43,7 +44,6 @@ void process_task_managment(int clientSocket, const char *userName)
             }
             buffer[bytesReceived] = '\0';
 
-            // Signal to seperate Name and Size of file
             char *delimiterPos = strchr(buffer, '\n');
             if (delimiterPos == NULL)
             {
@@ -132,7 +132,7 @@ void process_task_managment(int clientSocket, const char *userName)
     }
 }
 
-/*              Authentication Step  */
+/*  ========================== Authentication Step ==========================*/
 void createUser(int clientSocket)
 {
     char userName[256];
@@ -288,4 +288,5 @@ void authenticateUser(int clientSocket)
 
         printf("Incorrect password for user %s\n", userName);
     }
+    printf("\nUser %s has logged out/disconnected\n",userName);
 }
