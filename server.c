@@ -249,7 +249,7 @@ int main()
         printf("Client connected\n");
 
         pthread_t clientThread;
-        printf("Client casdaonnected\n");
+        printf("Client Disconnected\n");
 
         if (pthread_create(&clientThread, NULL, handleClient, clientSocket) != 0)
         {
