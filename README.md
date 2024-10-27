@@ -1,5 +1,5 @@
 
-# Server Program in C ###(with Queue-Based Reader-Writer Lock)
+# Server Program in C (with Queue-Based Reader-Writer Lock)
 <hr/>
 This project implements a multi-client server that uses a queue-based reader-writer lock to manage concurrent read and write operations for users. It uses threads, socket programming, and synchronization mechanisms to handle multiple clients efficiently. The server supports different tasks (such as upload, delete, update, download, and view) based on user requests, with synchronization to prevent data conflicts.
 
