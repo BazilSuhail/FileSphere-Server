@@ -21,13 +21,63 @@
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
-extern pthread_mutex_t mutex;
-extern pthread_cond_t readers_cond;
-extern pthread_cond_t writers_cond;
+#define MAX_CONNECTIONS 8
 
-extern int readers_count;
-extern int writers_waiting;
-extern int writer_active;
+typedef enum
+{
+    READ,
+    WRITE
+} RequestType;
+
+typedef struct
+{
+    RequestType type;
+    pthread_cond_t cond;
+} Request;
+
+// Define user structure with synchronization components
+/*typedef struct {
+    char userName[256];
+    int readCount;
+    int isWriting;
+    int connectionCount; // Count of active connections for this user
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+} UserInfo;
+*/
+
+typedef struct
+{
+    char userName[256];
+    int readCount;
+    int isWriting;
+    pthread_mutex_t mutex;
+    int connectionCount;
+    pthread_cond_t queueCond;
+    Request *requestQueue[MAX_CONNECTIONS];
+    int queueFront, queueBack;
+} UserInfo;
+
+extern UserInfo *users[MAX_CONNECTIONS];
+extern int currentConnections;
+extern pthread_mutex_t globalMutex;
+extern pthread_cond_t connectionCond;
+
+// extern pthread_mutex_t mutex;
+// extern pthread_cond_t readers_cond;
+// extern pthread_cond_t writers_cond;
+
+// extern int readers_count;
+// extern int writers_waiting;
+// extern int writer_active;
+
+// queue structure
+void enqueueRequest(UserInfo *user, Request *request);
+Request *dequeueRequest(UserInfo *user);
+void processQueue(UserInfo *user);
+
+//  user info funciton
+UserInfo *getUserInfo(const char *userName);
 
 // authenticate.c funcitons
 void process_task_managment(int clientSocket, const char *userName);
@@ -53,10 +103,10 @@ int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_F
 void write_FileInfo_to_user_Config(int clientSocket, const char *userName, const char *fileName, size_t fileSize);
 
 // sync
-void reader_exit();
-void reader_entry();
+void startRead(UserInfo *user);
+void finishRead(UserInfo *user);
 
-void writer_exit();
-void writer_entry();
+void startWrite(UserInfo *user);
+void finishWrite(UserInfo *user);
 
 #endif

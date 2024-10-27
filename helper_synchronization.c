@@ -1,53 +1,89 @@
 #include "helper.h"
 
-void reader_entry() {
-    pthread_mutex_lock(&mutex);
-    
-    // Wait if a writer is active or waiting
-    while (writer_active || writers_waiting > 0) {
-        pthread_cond_wait(&readers_cond, &mutex);
+// Start reading process with queue-based synchronization
+void startRead(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    Request request = { .type = READ };
+    pthread_cond_init(&request.cond, NULL);
+
+    enqueueRequest(user, &request);
+    while (user->isWriting || user->queueFront != user->queueBack && user->requestQueue[user->queueFront] != &request) {
+        pthread_cond_wait(&request.cond, &user->mutex);
     }
-    
-    readers_count++;
-    pthread_mutex_unlock(&mutex);
+
+    dequeueRequest(user);
+    user->readCount++;
+    processQueue(user);
+    pthread_mutex_unlock(&user->mutex);
 }
 
-void reader_exit() {
-    pthread_mutex_lock(&mutex);
-    
-    readers_count--;
-    if (readers_count == 0) {
-        // Signal a writer if waiting
-        pthread_cond_signal(&writers_cond);  
+// Finish reading process and update queue
+void finishRead(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    user->readCount--;
+    if (user->readCount == 0) {
+        processQueue(user);
     }
-    
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&user->mutex);
 }
 
-void writer_entry() {
-    pthread_mutex_lock(&mutex);
-    
-    writers_waiting++;
-    // Wait if a reader or another writer is active
-    while (readers_count > 0 || writer_active) {
-        pthread_cond_wait(&writers_cond, &mutex);
+// Start writing process with queue-based synchronization
+void startWrite(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    Request request = { .type = WRITE };
+    pthread_cond_init(&request.cond, NULL);
+
+    enqueueRequest(user, &request);
+    while (user->isWriting || user->readCount > 0 || user->queueFront != user->queueBack && user->requestQueue[user->queueFront] != &request) {
+        pthread_cond_wait(&request.cond, &user->mutex);
     }
-    
-    writers_waiting--;
-    writer_active = 1;
-    pthread_mutex_unlock(&mutex);
+
+    dequeueRequest(user);
+    user->isWriting = 1;
+    pthread_mutex_unlock(&user->mutex);
 }
-void writer_exit() {
-    pthread_mutex_lock(&mutex);
-    
-    writer_active = 0;
-    
-    // Prioritize writers over readers
-    if (writers_waiting > 0) {
-        pthread_cond_signal(&writers_cond);
-    } else {
-        pthread_cond_broadcast(&readers_cond);  // Wake up all waiting readers
+
+// Finish writing process and update queue
+void finishWrite(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    user->isWriting = 0;
+    processQueue(user);
+    pthread_mutex_unlock(&user->mutex);
+}
+
+
+/*
+void startRead(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    while (user->isWriting) {
+        pthread_cond_wait(&user->cond, &user->mutex);
     }
-    
-    pthread_mutex_unlock(&mutex);
+    user->readCount++;
+    pthread_mutex_unlock(&user->mutex);
 }
+
+void finishRead(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    user->readCount--;
+    if (user->readCount == 0) {
+        pthread_cond_signal(&user->cond);
+    }
+    pthread_mutex_unlock(&user->mutex);
+}
+
+void startWrite(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    while (user->isWriting || user->readCount > 0) {
+        pthread_cond_wait(&user->cond, &user->mutex);
+    }
+    user->isWriting = 1;
+    pthread_mutex_unlock(&user->mutex);
+}
+
+void finishWrite(UserInfo *user) {
+    pthread_mutex_lock(&user->mutex);
+    user->isWriting = 0;
+    pthread_cond_broadcast(&user->cond);
+    pthread_mutex_unlock(&user->mutex);
+}
+*/

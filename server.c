@@ -1,13 +1,168 @@
-#include "helper.h" 
+#include "helper.h"
 #define PORT 8000
- 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t readers_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t writers_cond = PTHREAD_COND_INITIALIZER;
 
-int readers_count = 0;  // Number of active readers
-int writers_waiting = 0; // Number of writers waiting
-int writer_active = 0;   // Writer currently writing
+UserInfo *users[MAX_CONNECTIONS] = {NULL}; // Define users with NULL initialization if needed
+int currentConnections = 0;
+pthread_mutex_t globalMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t connectionCond = PTHREAD_COND_INITIALIZER;
+
+// Helper function to get or initialize UserInfo
+/*UserInfo *getUserInfo(const char *userName) {
+    pthread_mutex_lock(&globalMutex);
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        if (users[i] && strcmp(users[i]->userName, userName) == 0) {
+            pthread_mutex_unlock(&globalMutex);
+            return users[i];
+        }
+    }
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        if (users[i] == NULL) {
+            users[i] = (UserInfo *)malloc(sizeof(UserInfo));
+            strncpy(users[i]->userName, userName, sizeof(users[i]->userName));
+            users[i]->readCount = 0;
+            users[i]->isWriting = 0;
+            users[i]->connectionCount = 0; // Initialize connection count
+            pthread_mutex_init(&users[i]->mutex, NULL);
+            pthread_cond_init(&users[i]->cond, NULL);
+            pthread_mutex_unlock(&globalMutex);
+            return users[i];
+        }
+    }
+    pthread_mutex_unlock(&globalMutex);
+    return NULL;
+}
+*/
+// Helper function to get or initialize UserInfo
+UserInfo *getUserInfo(const char *userName) {
+    pthread_mutex_lock(&globalMutex);
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        if (users[i] && strcmp(users[i]->userName, userName) == 0) {
+            pthread_mutex_unlock(&globalMutex);
+            return users[i];
+        }
+    }
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        if (users[i] == NULL) {
+            users[i] = (UserInfo *)malloc(sizeof(UserInfo));
+            strncpy(users[i]->userName, userName, sizeof(users[i]->userName));
+            users[i]->readCount = 0;
+            users[i]->isWriting = 0;
+            users[i]->queueFront = users[i]->queueBack = 0;
+            pthread_mutex_init(&users[i]->mutex, NULL);
+            pthread_cond_init(&users[i]->queueCond, NULL);
+            pthread_mutex_unlock(&globalMutex);
+            return users[i];
+        }
+    }
+    pthread_mutex_unlock(&globalMutex);
+    return NULL;
+}
+
+// Enqueue a request to a user's queue
+void enqueueRequest(UserInfo *user, Request *request) {
+    user->requestQueue[user->queueBack] = request;
+    user->queueBack = (user->queueBack + 1) % MAX_CONNECTIONS;
+}
+
+// Dequeue a request from a user's queue
+Request *dequeueRequest(UserInfo *user) {
+    if (user->queueFront == user->queueBack) return NULL;
+    Request *request = user->requestQueue[user->queueFront];
+    user->queueFront = (user->queueFront + 1) % MAX_CONNECTIONS;
+    return request;
+}
+
+// Process the next request in the user's queue
+void processQueue(UserInfo *user) {
+    if (user->queueFront == user->queueBack) return;
+
+    Request *nextRequest = user->requestQueue[user->queueFront];
+    if (nextRequest->type == READ && !user->isWriting) {
+        pthread_cond_broadcast(&nextRequest->cond);
+    } else if (nextRequest->type == WRITE && user->readCount == 0 && !user->isWriting) {
+        pthread_cond_signal(&nextRequest->cond);
+    }
+}
+
+// Client handler function
+
+void *handle_auth(int clientSocket) {
+    //int clientSocket = *(int *)arg;
+    //free(arg);
+
+    pthread_mutex_lock(&globalMutex);
+    while (currentConnections >= MAX_CONNECTIONS) {
+        pthread_cond_wait(&connectionCond, &globalMutex);
+    }
+    currentConnections++;
+    pthread_mutex_unlock(&globalMutex);
+
+    authenticateUser(clientSocket);
+
+    close(clientSocket);
+
+    pthread_mutex_lock(&globalMutex);
+    currentConnections--;
+    pthread_cond_signal(&connectionCond);
+    pthread_mutex_unlock(&globalMutex);
+
+    return NULL;
+}
+
+/*
+void *handleClient(void *clientSocketPtr)
+{
+    int clientSocket = *((int *)clientSocketPtr);
+    free(clientSocketPtr);
+    
+    // Lock the mutex to safely check the currentConnections
+    pthread_mutex_lock(&globalMutex);
+
+    if (currentConnections >= MAX_CONNECTIONS)
+    {
+        // Notify the client that the server is busy
+        const char *busyMessage = "Server is busy. Please try again later.";
+        send(clientSocket, busyMessage, strlen(busyMessage) + 1, 0);
+        // Close the socket and release the lock
+        close(clientSocket);
+        pthread_mutex_unlock(&globalMutex);
+        return NULL;
+    }
+
+    // Increase connection count as we're about to handle a client
+    manageConnections(1);
+    pthread_mutex_unlock(&globalMutex); 
+    int option;
+    ssize_t bytesReceived;
+    bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
+    printf("opt: %d", option);
+    if (bytesReceived <= 0)
+    {
+        perror("Error receiving option");
+        close(clientSocket);
+        manageConnections(-1);
+        return NULL;
+    }
+
+    if (option == 1)
+    {
+        createUser(clientSocket);
+    }
+    else if (option == 2)
+    {
+        authenticateUser(clientSocket);
+    }
+    else
+    {
+        send(clientSocket, "Invalid option", strlen("Invalid option"), 0);
+    }
+
+    close(clientSocket);
+
+    // Decrement connection count after finishing handling the client
+    manageConnections(-1);
+    return NULL;
+}*/
 
 void *handleClient(void *clientSocketPtr)
 {
@@ -29,7 +184,7 @@ void *handleClient(void *clientSocketPtr)
     }
     else if (option == 2)
     {
-        authenticateUser(clientSocket);
+        handle_auth(clientSocket);
     }
     else
     {
@@ -39,6 +194,7 @@ void *handleClient(void *clientSocketPtr)
     close(clientSocket);
     return NULL;
 }
+
 
 int main()
 {
@@ -71,7 +227,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port %d...\n",PORT);
+    printf("Server listening on port %d...\n", PORT);
 
     while (1)
     {
@@ -93,6 +249,8 @@ int main()
         printf("Client connected\n");
 
         pthread_t clientThread;
+        printf("Client casdaonnected\n");
+
         if (pthread_create(&clientThread, NULL, handleClient, clientSocket) != 0)
         {
             perror("Error creating thread");

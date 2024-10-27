@@ -17,117 +17,118 @@ int checkFileExists(char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int fileCount,
 void process_task_managment(int clientSocket, const char *userName)
 {
     int option;
-    ssize_t bytesReceived;
-    bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
-    if (bytesReceived <= 0)
-    {
+    ssize_t bytesReceived = recv(clientSocket, &option, sizeof(option), 0);
+    if (bytesReceived <= 0) {
         perror("Error receiving option");
         return;
     }
-
-    // Upload  FileCode
-    if (option == 1)
+    UserInfo *user = getUserInfo(userName); 
+ /*====================== UPLOAD, DOWNLOAD AND DEKETE ====================== */
+    if (option == 1 || option == 4 || option == 5)
     {
-        writer_entry();
-        char buffer[1024];
-        char fileName[256];
-        long fileSize;
-        char fileSizeStr[50];
-
-        bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-        if (bytesReceived <= 0)
+        startWrite(user);
+        // Upload  FileCode
+        if (option == 1)
         {
-            perror("Error receiving data");
-            return;
-        }
-        buffer[bytesReceived] = '\0';
+            char buffer[1024];
+            char fileName[256];
+            long fileSize;
+            char fileSizeStr[50];
 
-        // Signal to seperate Name and Size of file
-        char *delimiterPos = strchr(buffer, '\n');
-        if (delimiterPos == NULL)
+            bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+            if (bytesReceived <= 0)
+            {
+                perror("Error receiving data");
+                return;
+            }
+            buffer[bytesReceived] = '\0';
+
+            // Signal to seperate Name and Size of file
+            char *delimiterPos = strchr(buffer, '\n');
+            if (delimiterPos == NULL)
+            {
+                perror("Error: No delimiter found between file name and file size");
+                return;
+            }
+
+            strncpy(fileName, buffer, delimiterPos - buffer);
+            fileName[delimiterPos - buffer] = '\0';
+            strcpy(fileSizeStr, delimiterPos + 1);
+
+            printf("File \' %s \' with size %s Received from User \"%s\"\n", fileName, fileSizeStr, userName);
+            // printf("File size: %s bytes\n", fileSizeStr);
+
+            fileSize = strtol(fileSizeStr, NULL, 10);
+            if (fileSize == 0 && (fileSizeStr[0] != '0' || fileSizeStr[0] == '\0'))
+            {
+                perror("Error converting file size to long");
+                return;
+            }
+
+            printf("File size Recieved: %ld bytes\n", fileSize);
+            write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
+        }
+        // Delete File Code
+        else if (option == 4)
         {
-            perror("Error: No delimiter found between file name and file size");
-            return;
+            char fileName[MAX_FILENAME_SIZE];
+            bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+            if (bytesReceived <= 0)
+            {
+                perror("Error receiving file name for download");
+                return;
+            }
+            fileName[bytesReceived] = '\0';
+            delete_File_from_user_Config(clientSocket, userName, fileName);
         }
-
-        strncpy(fileName, buffer, delimiterPos - buffer);
-        fileName[delimiterPos - buffer] = '\0';
-        strcpy(fileSizeStr, delimiterPos + 1);
-
-        printf("File \' %s \' with size %s Received from User \"%s\"\n", fileName, fileSizeStr, userName);
-        // printf("File size: %s bytes\n", fileSizeStr);
-
-        fileSize = strtol(fileSizeStr, NULL, 10);
-        if (fileSize == 0 && (fileSizeStr[0] != '0' || fileSizeStr[0] == '\0'))
+        // Update File Code
+        else if (option == 5)
         {
-            perror("Error converting file size to long");
-            return;
+            receive_updated_file_content(clientSocket, userName);
         }
-
-        printf("File size Recieved: %ld bytes\n", fileSize);
-        write_FileInfo_to_user_Config(clientSocket, userName, fileName, fileSize);
-        writer_exit();
+        finishWrite(user);
     }
-    // Download  FileCode
-    else if (option == 2)
-    {
-        reader_entry();
-        char fileName[MAX_FILENAME_SIZE];
-        bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
-        if (bytesReceived <= 0)
-        {
-            perror("Error receiving file name for download");
-            return;
-        }
-        fileName[bytesReceived] = '\0';
 
-        char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
-        int fileCount = 0;
+    /*====================== DOWNLOAD VIEW CODE ====================== */
+    else if (option == 2 || option == 3)
+    {
+        startRead(user);
+        // Download  FileCode
+        if (option == 2)
+        {
+            char fileName[MAX_FILENAME_SIZE];
+            bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
+            if (bytesReceived <= 0)
+            {
+                perror("Error receiving file name for download");
+                return;
+            }
+            fileName[bytesReceived] = '\0';
 
-        parseFileAfterAsterisk(userName, fileNames, &fileCount);
-        if (checkFileExists(fileNames, fileCount, fileName))
-        {
-            printf("The file '%s' exists in the list.\n", fileName);
-            const char *fileFoundMsg = "File found.";
-            send(clientSocket, fileFoundMsg, strlen(fileFoundMsg) + 1, 0);
-            sendFileToClient(clientSocket, userName);
+            char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
+            int fileCount = 0;
+
+            parseFileAfterAsterisk(userName, fileNames, &fileCount);
+            if (checkFileExists(fileNames, fileCount, fileName))
+            {
+                printf("The file '%s' exists in the list.\n", fileName);
+                const char *fileFoundMsg = "File found.";
+                send(clientSocket, fileFoundMsg, strlen(fileFoundMsg) + 1, 0);
+                sendFileToClient(clientSocket, userName);
+            }
+            else
+            {
+                printf("The file '%s' does not exist in the list.\n", fileName);
+                const char *errorMsg = "Error parsing config file.";
+                send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
+            }
         }
-        else
+        // View Files Code
+        else if (option == 3)
         {
-            printf("The file '%s' does not exist in the list.\n", fileName);
-            const char *errorMsg = "Error parsing config file.";
-            send(clientSocket, errorMsg, strlen(errorMsg) + 1, 0);
+            viewFile(clientSocket, userName);
         }
-        reader_exit();
-    }
-    // View Files Code
-    else if (option == 3)
-    {
-        reader_entry();
-        viewFile(clientSocket, userName);
-        reader_exit();
-    }
-    // Delete File Code
-    else if (option == 4)
-    {
-        writer_entry();
-        char fileName[MAX_FILENAME_SIZE];
-        bytesReceived = recv(clientSocket, fileName, sizeof(fileName) - 1, 0);
-        if (bytesReceived <= 0)
-        {
-            perror("Error receiving file name for download");
-            return;
-        }
-        fileName[bytesReceived] = '\0';
-        delete_File_from_user_Config(clientSocket, userName, fileName);
-        writer_exit();
-    }
-    // Update File Code
-    else if (option == 5)
-    {
-        writer_entry();
-        receive_updated_file_content(clientSocket, userName);
-        writer_exit();
+        finishRead(user);
     }
 }
 
@@ -220,6 +221,8 @@ void authenticateUser(int clientSocket)
         return;
     }
     userName[userNameSize] = '\0';
+    printf("User %s",userName);
+
 
     char filePath[1024];
     snprintf(filePath, sizeof(filePath), "%s/%s.config", userName, userName);
