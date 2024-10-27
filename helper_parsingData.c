@@ -10,10 +10,9 @@ int calculateSumOfSizes(int *sizes, int count)
     return sum;
 }
 
-/* =====================================================================
-       User file storage checking Files Functionality
-========================================================================  */
-void receive_replacleAble_file_content(int clientSocket, const char *userName, const char *fileNameParam)
+/* ======    User file storage checking Files Functionality     =====  */
+
+void receive_replace_able_file_content(int clientSocket, const char *userName, const char *fileNameParam)
 {
     char filePath[1024];
     snprintf(filePath, sizeof(filePath), "%s/%s", userName, fileNameParam);
@@ -132,7 +131,7 @@ void updateFileCount(int clientSocket, const char *userName, const char *targetF
     fprintf(configFile, "%s - %d\n", formattedFileName, fileCounts[targetIndex]);
     fclose(configFile);
 
-    receive_replacleAble_file_content(clientSocket, userName, formattedFileName);
+    receive_replace_able_file_content(clientSocket, userName, formattedFileName);
 }
 
 void handleFileExists(int clientSocket, const char *fileName, const char *userName, const char *ActualFile)
@@ -161,9 +160,8 @@ void handleFileExists(int clientSocket, const char *fileName, const char *userNa
     }
 }
 
-/* =====================================================================
-            Parse File for Checking User's Storage And Info
-========================================================================  */
+/* =====   Parse File for Checking User's Storage And Info      ======  */
+
 int parseFileAfterAsterisk(const char *userName, char fileNames[MAX_FILES][MAX_FILENAME_SIZE], int *fileCount)
 {
     char filePath[1024];

@@ -1,14 +1,11 @@
 #include "helper.h"
 
-/* =====================================================================
-                        View Files Functionality
-========================================================================  */
+/* =======  View Files Functionality     =====  */
+
 int viewFile(int clientSocket, const char *userName)
 {
     char user_config[1024];
-    // snprintf(user_config, sizeof(user_config), "%s.config", userName);
     snprintf(user_config, sizeof(user_config), "%s/%s.config", userName, userName);
-
     int fileDescriptor = open(user_config, O_RDONLY);
     if (fileDescriptor < 0)
     {
@@ -64,9 +61,8 @@ int viewFile(int clientSocket, const char *userName)
     return 0;
 }
 
-/* =====================================================================
-                Send and Recieve File to the Client and View Files
-   =====================================================================  */
+/* =====    Send and Recieve File to the Client and View Files   =======  */
+
 void sendFileToClient(int clientSocket, const char *userName)
 {
     char fileName[256];
@@ -157,9 +153,8 @@ void receiveFileFromClient(int clientSocket, const char *userName)
     fclose(encoded_file);
 }
 
-/* =====================================================================
-            Delete file req from user
-========================================================================  */
+/* ========    Delete file req from user =========  */
+
 void delete_File_from_user_Config(int clientSocket, const char *userName, const char *fileName)
 {
     char filePath[1024];
@@ -278,9 +273,8 @@ void delete_File_from_user_Config(int clientSocket, const char *userName, const 
     printf("File '%s' successfully deleted from user: %s\n", fileName, userName);
 }
 
-/* =====================================================================
-                 Update the file requested from user
-========================================================================  */
+/* ======    Update the file requested from user =======  */
+
 void receive_updated_file_content(int clientSocket, const char *userName)
 {
     char fileName[256];
