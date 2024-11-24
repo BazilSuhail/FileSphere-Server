@@ -6,7 +6,6 @@ int currentConnections = 0;
 pthread_mutex_t globalMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t connectionCond = PTHREAD_COND_INITIALIZER;
 
-
 // Helper function to get or initialize UserInfo
 UserInfo *getUserInfo(const char *userName)
 {
@@ -24,6 +23,13 @@ UserInfo *getUserInfo(const char *userName)
         if (users[i] == NULL)
         {
             users[i] = (UserInfo *)malloc(sizeof(UserInfo));
+            /*
+            if (!users[i]) {
+            perror("malloc failed");
+            pthread_mutex_unlock(&globalMutex);
+            return NULL;
+            } */
+           
             strncpy(users[i]->userName, userName, sizeof(users[i]->userName));
             users[i]->readCount = 0;
             users[i]->isWriting = 0;
@@ -111,7 +117,7 @@ void *handleClient(void *clientSocketPtr)
     {
         send(clientSocket, "Invalid option", strlen("Invalid option"), 0);
     }
-    // ============================================================== 
+    // ==============================================================
     close(clientSocket);
     // Lock mutex to safely update the connection counter and signal waiting threads
     pthread_mutex_lock(&globalMutex);
