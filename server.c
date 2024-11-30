@@ -1,35 +1,20 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <pthread.h>
-#include <sys/types.h>
 #include <errno.h>
 #include <semaphore.h>
-
+#include"fileoperations.h"
 #define MAX_SIZE 1024
 #define MAX_STORAGE 50
-
-#define MAX_FILES 100
-#define MAX_FILENAME_SIZE 100
-typedef struct
-{
-    char operation;
-    char filename[MAX_FILENAME_SIZE];
-    size_t fileSize;
-    char userName[256];
-    int clientSocket;
-} FileOperation;
+#define PORT 8081
 
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct
 {
-    FileOperation operations[MAX_STORAGE];
+    FileOperation *operations[MAX_STORAGE];
     int front;
     int rear;
     int count;
@@ -62,7 +47,7 @@ int isQueueEmpty()
     return fileQueue.count == 0;
 }
 
-void enqueue(FileOperation operation)
+void enqueue(FileOperation *operation)
 {
     pthread_mutex_lock(&queueMutex);
     fileQueue.rear = (fileQueue.rear + 1) % MAX_STORAGE;
@@ -73,9 +58,9 @@ void enqueue(FileOperation operation)
     pthread_mutex_unlock(&queueMutex);
 }
 
-FileOperation dequeue()
+FileOperation* dequeue()
 {
-    FileOperation operation;
+    FileOperation *operation=createFileOperation();
     pthread_mutex_lock(&queueMutex);
     operation = fileQueue.operations[fileQueue.front];
     fileQueue.front = (fileQueue.front + 1) % MAX_STORAGE;
@@ -639,12 +624,12 @@ void processFileManagement(int clientSocket, const char *userName)
             perror("Error receiving file size");
             return;
         }
-        FileOperation operation;
-        operation.clientSocket=clientSocket;
-        operation.operation='w';
-        strcpy(operation.filename , fileName);
-        strcpy(operation.userName ,userName);
-        operation.fileSize=fileSize;
+        FileOperation *operation=createFileOperation();
+        operation->clientSocket=clientSocket;
+        operation->operation='w';
+        strcpy(operation->filename , fileName);
+        strcpy(operation->userName ,userName);
+        operation->fileSize=fileSize;
         enqueue(operation);
         
 
@@ -662,12 +647,12 @@ void processFileManagement(int clientSocket, const char *userName)
             return;
         }
         fileName[bytesReceived] = '\0';
-        FileOperation operation;
-        operation.clientSocket = clientSocket;
-        strcpy(operation.filename,fileName);
-        operation.fileSize = 0;
-        operation.operation = 'r';
-        strcpy(operation.userName,userName);
+        FileOperation *operation=createFileOperation();
+        operation->clientSocket = clientSocket;
+        strcpy(operation->filename,fileName);
+        operation->fileSize = 0;
+        operation->operation = 'r';
+        strcpy(operation->userName,userName);
 
         enqueue(operation);
 
@@ -693,12 +678,12 @@ void processFileManagement(int clientSocket, const char *userName)
     }
     else if (option == 3)
     {
-        FileOperation operation;
-        operation.clientSocket = clientSocket;
-        strcpy(operation.filename , "abc");
-        operation.fileSize = 0;
-        operation.operation = 'v';
-        strcpy(operation.userName,userName);
+        FileOperation *operation=createFileOperation();
+        operation->clientSocket = clientSocket;
+        strcpy(operation->filename , "abc");
+        operation->fileSize = 0;
+        operation->operation = 'v';
+        strcpy(operation->userName,userName);
         enqueue(operation);
         //viewFile(clientSocket, userName);
     }
@@ -713,36 +698,36 @@ void fileHandler()
         sem_wait(&queueSemaphore); // Wait for data in the queue
         if (!isQueueEmpty())
         {
-            FileOperation operation = dequeue();
-            if (operation.operation == 'w'){
-                write_FileInfo_to_user_Config(operation.clientSocket, operation.userName,operation.filename, operation.fileSize);
-                close(operation.clientSocket);
+            FileOperation *operation = dequeue();
+            if (operation->operation == 'w'){
+                write_FileInfo_to_user_Config(operation->clientSocket, operation->userName,operation->filename, operation->fileSize);
+                close(operation->clientSocket);
             }    
-            else if (operation.operation == 'r')
+            else if (operation->operation == 'r')
             {
                 char fileNames[MAX_FILES][MAX_FILENAME_SIZE];
                 int fileCount = 0;
 
-                parseFileAfterAsterisk(operation.userName, fileNames, &fileCount);
-                if (checkFileExists(fileNames, fileCount, operation.filename))
+                parseFileAfterAsterisk(operation->userName, fileNames, &fileCount);
+                if (checkFileExists(fileNames, fileCount, operation->filename))
                 {
-                    printf("The file '%s' exists in the list.\n", operation.filename);
+                    printf("The file '%s' exists in the list.\n", operation->filename);
                     const char *fileFoundMsg = "File found.";
-                    send(operation.clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
-                    sendFileToClient(operation.clientSocket, operation.userName);
+                    send(operation->clientSocket, fileFoundMsg, strlen(fileFoundMsg), 0);
+                    sendFileToClient(operation->clientSocket, operation->userName);
                 }
                 else
                 {
-                    printf("The file '%s' does not exist in the list.\n", operation.filename);
+                    printf("The file '%s' does not exist in the list.\n", operation->filename);
                     const char *errorMsg = "Error parsing config file.";
-                    send(operation.clientSocket, errorMsg, strlen(errorMsg), 0);
+                    send(operation->clientSocket, errorMsg, strlen(errorMsg), 0);
                 }
-                close(operation.clientSocket);
+                close(operation->clientSocket);
             }
-            else if(operation.operation == 'v')
+            else if(operation->operation == 'v')
             {
-                viewFile(operation.clientSocket, operation.userName);
-                close(operation.clientSocket);
+                viewFile(operation->clientSocket, operation->userName);
+                close(operation->clientSocket);
             }
 
                 
@@ -813,7 +798,7 @@ int main()
 
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8081);
+    serverAddr.sin_port = htons(PORT);
 
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
