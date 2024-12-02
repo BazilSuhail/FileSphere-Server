@@ -1,6 +1,7 @@
 #include "helper.h"
 #define PORT 8000
 
+
 UserInfo *users[MAX_CONNECTIONS] = {NULL};
 int currentConnections = 0;
 pthread_mutex_t globalMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -22,7 +23,8 @@ UserInfo *getUserInfo(const char *userName)
     {
         if (users[i] == NULL)
         {
-            users[i] = (UserInfo *)malloc(sizeof(UserInfo));
+            users[i] = (UserInfo *)my_malloc(sizeof(UserInfo));
+            
             /*
             if (!users[i]) {
             perror("malloc failed");
@@ -120,6 +122,7 @@ void *handleClient(void *clientSocketPtr)
     // ==============================================================
     close(clientSocket);
     // Lock mutex to safely update the connection counter and signal waiting threads
+
     pthread_mutex_lock(&globalMutex);
     currentConnections--;
     // Signal one of the waiting threads that a connection slot is available
@@ -160,6 +163,12 @@ int main()
     }
 
     printf("Server listening on port %d...\n", PORT);
+    
+    if (initialize_arena() == -1)
+    {
+        printf("Failed to initialize memory arena.\n");
+        return 1;
+    }
 
     while (1)
     {

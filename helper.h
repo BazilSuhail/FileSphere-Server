@@ -20,7 +20,7 @@
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
-#define MAX_CONNECTIONS 2
+#define MAX_CONNECTIONS 8
 
 typedef enum {
     READ,
@@ -86,5 +86,13 @@ void finishRead(UserInfo *user);
 
 void startWrite(UserInfo *user);
 void finishWrite(UserInfo *user);
+
+// areena Memory
+void *new_memory_request(int size);
+int initialize_arena();
+void *my_malloc(int size);
+void free_memory(void *ptr);
+void *my_remalloc(void *ptr, int size);
+void collapse_free_memory();
 
 #endif

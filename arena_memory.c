@@ -1,10 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include "helper.h"
 
 #define BIN_COUNT 3
-#define BIN_SIZE 32
+#define BIN_SIZE 128
 #define PAGE_SIZE 4096
 
 typedef struct Chunk
@@ -32,8 +29,9 @@ void *new_memory_request(int size)
     return ptr;
 }
 
-int initialize_arena(int arena_size)
+int initialize_arena()
 {
+    int arena_size= 10*PAGE_SIZE;
     allocator.arena_start = malloc(arena_size);
     if (!allocator.arena_start)
         return -1;
