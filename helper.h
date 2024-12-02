@@ -20,7 +20,7 @@
 #define MAX_FILES 100
 #define MAX_FILENAME_SIZE 100
 
-#define MAX_CONNECTIONS 8
+#define MAX_CONNECTIONS 2
 
 typedef enum {
     READ,

@@ -1,5 +1,5 @@
 #include "helper.h"
-#define PORT 8000
+#define PORT 8001
 
 
 UserInfo *users[MAX_CONNECTIONS] = {NULL};
@@ -80,7 +80,7 @@ void processQueue(UserInfo *user)
 void *handleClient(void *clientSocketPtr)
 {
     int clientSocket = *((int *)clientSocketPtr);
-    free(clientSocketPtr);
+    free_memory(clientSocketPtr);
 
     pthread_mutex_lock(&globalMutex);
     if (currentConnections >= MAX_CONNECTIONS)
@@ -172,7 +172,7 @@ int main()
 
     while (1)
     {
-        int *clientSocket = malloc(sizeof(int));
+        int *clientSocket = my_malloc(sizeof(int));
         if (!clientSocket)
         {
             perror("Error allocating memory");

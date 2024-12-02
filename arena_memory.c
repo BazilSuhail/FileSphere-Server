@@ -22,7 +22,10 @@ Allocator allocator = {{NULL}, NULL, 0, 0};
 
 void *new_memory_request(int size)
 {
-    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+     int remainder = size % PAGE_SIZE;
+    if (remainder != 0) {
+        size = size + (PAGE_SIZE - remainder); 
+    }
     void *ptr = sbrk(size);
     if (ptr == (void *)-1)
         return NULL;
