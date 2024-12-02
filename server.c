@@ -1,5 +1,6 @@
 #include "helper.h"
-#define PORT 8000
+#define PORT 8001
+
 
 UserInfo *users[MAX_CONNECTIONS] = {NULL};
 int currentConnections = 0;
@@ -22,7 +23,8 @@ UserInfo *getUserInfo(const char *userName)
     {
         if (users[i] == NULL)
         {
-            users[i] = (UserInfo *)malloc(sizeof(UserInfo));
+            users[i] = (UserInfo *)my_malloc(sizeof(UserInfo));
+            
             /*
             if (!users[i]) {
             perror("malloc failed");
@@ -78,7 +80,7 @@ void processQueue(UserInfo *user)
 void *handleClient(void *clientSocketPtr)
 {
     int clientSocket = *((int *)clientSocketPtr);
-    free(clientSocketPtr);
+    free_memory(clientSocketPtr);
 
     pthread_mutex_lock(&globalMutex);
     if (currentConnections >= MAX_CONNECTIONS)
@@ -120,6 +122,7 @@ void *handleClient(void *clientSocketPtr)
     // ==============================================================
     close(clientSocket);
     // Lock mutex to safely update the connection counter and signal waiting threads
+
     pthread_mutex_lock(&globalMutex);
     currentConnections--;
     // Signal one of the waiting threads that a connection slot is available
@@ -160,10 +163,16 @@ int main()
     }
 
     printf("Server listening on port %d...\n", PORT);
+    
+    if (initialize_arena() == -1)
+    {
+        printf("Failed to initialize memory arena.\n");
+        return 1;
+    }
 
     while (1)
     {
-        int *clientSocket = malloc(sizeof(int));
+        int *clientSocket = my_malloc(sizeof(int));
         if (!clientSocket)
         {
             perror("Error allocating memory");
